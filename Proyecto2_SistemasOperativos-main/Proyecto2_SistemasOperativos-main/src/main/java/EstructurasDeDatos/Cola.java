@@ -11,28 +11,30 @@ package EstructurasDeDatos;
 public class Cola<T> {
     private Nodo<T> frente;
     private Nodo<T> finalCola;
+    private int tamano;
 
     public Cola() {
         this.frente = null;
         this.finalCola = null;
+        this.tamano = 0;
     }
 
     /**
      * Agrega un elemento al final de la cola.
      */
     public void encolar(T dato) {
-        Nodo<T> nuevoNodo = new Nodo<>(dato);
+        Nodo<T> nuevoNodo = new Nodo<T>(dato);
 
         // Si la cola está vacía, el frente y el final son el mismo nodo
         if (finalCola == null) {
             frente = nuevoNodo;
             finalCola = nuevoNodo;
-            return;
+        } else {
+            // Conectar el nuevo nodo al final y actualizar el puntero 'finalCola'
+            finalCola.setSiguiente(nuevoNodo);
+            finalCola = nuevoNodo;
         }
-
-        // Conectar el nuevo nodo al final y actualizar el puntero 'finalCola'
-        finalCola.setSiguiente(nuevoNodo);
-        finalCola = nuevoNodo;
+        tamano++;
     }
 
     /**
@@ -43,12 +45,12 @@ public class Cola<T> {
         // Validar si la cola está vacía
         if (frente == null) {
             System.out.println("La cola está vacía, no hay nada que desencolar.");
-            return null; 
+            return null;
         }
 
         // Extraer el dato del frente
         T dato = frente.getDato();
-        
+
         // Mover el frente al siguiente nodo
         frente = frente.getSiguiente();
 
@@ -57,7 +59,26 @@ public class Cola<T> {
         if (frente == null) {
             finalCola = null;
         }
+        tamano--;
 
         return dato;
+    }
+
+    /**
+     * Lee y devuelve el elemento al frente sin extraerlo.
+     */
+    public T frente() {
+        if (frente == null) {
+            return null;
+        }
+        return frente.getDato();
+    }
+
+    public boolean estaVacia() {
+        return frente == null;
+    }
+
+    public int obtenerTamano() {
+        return tamano;
     }
 }
