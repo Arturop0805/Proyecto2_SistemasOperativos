@@ -14,11 +14,13 @@ public class EntradaFAT {
     private String nombreArchivo;
     private int cantidadBloques;
     private int direccionPrimerBloque;
+    private String propietario;
 
-    public EntradaFAT(String nombreArchivo, int cantidadBloques, int direccionPrimerBloque) {
+    public EntradaFAT(String nombreArchivo, int cantidadBloques, int direccionPrimerBloque, String propietario) {
         this.nombreArchivo = nombreArchivo;
         this.cantidadBloques = cantidadBloques;
         this.direccionPrimerBloque = direccionPrimerBloque;
+        this.propietario = propietario;
     }
 
     public String getNombreArchivo() {
@@ -43,5 +45,13 @@ public class EntradaFAT {
 
     public void setDireccionPrimerBloque(int direccionPrimerBloque) {
         this.direccionPrimerBloque = direccionPrimerBloque;
+    }
+
+    public String getPropietario() {
+        return propietario;
+    }
+
+    public void setPropietario(String propietario) {
+        this.propietario = propietario;
     }
 }

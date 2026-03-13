@@ -3,7 +3,6 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package EstructurasDeDatos;
-
 /**
  * Estructura de Árbol N-ario genérica para la jerarquía de directorios.
  * 
@@ -11,7 +10,7 @@ package EstructurasDeDatos;
  */
 public class ArbolNario<T> {
     private NodoArbol<T> raiz;
-
+    
     public ArbolNario() {
         this.raiz = null;
     }

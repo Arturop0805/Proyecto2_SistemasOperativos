@@ -20,8 +20,8 @@ public class TablaAsignacion {
     /**
      * Registra un nuevo archivo en la FAT.
      */
-    public void registrarArchivo(String nombreArchivo, int cantidadBloques, int direccionPrimerBloque) {
-        EntradaFAT nuevaEntrada = new EntradaFAT(nombreArchivo, cantidadBloques, direccionPrimerBloque);
+    public void registrarArchivo(String nombreArchivo, int cantidadBloques, int direccionPrimerBloque, String propietario) {
+        EntradaFAT nuevaEntrada = new EntradaFAT(nombreArchivo, cantidadBloques, direccionPrimerBloque, propietario);
         entradas.insertarAlFinal(nuevaEntrada);
     }
 
