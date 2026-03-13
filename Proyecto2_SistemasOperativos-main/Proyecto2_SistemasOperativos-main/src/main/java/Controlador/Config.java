@@ -39,7 +39,11 @@ public class Config {
     // PLANIFICADOR Y SIMULACIÓN
     // ==========================================
     public static final String POLITICA_DEFECTO = "FIFO";
-    public static final int VELOCIDAD_RELOJ_MS  = 1000; // Velocidad del timer en la GUI (1 seg)
+    // Tiempo base de ciclo (ms)
+    public static final int VELOCIDAD_RELOJ_MS  = 1000; // Valor inicial del timer (1 seg)
+    // Rango permitido para el slider de velocidad (en ms)
+    public static final int VELOCIDAD_MIN_MS = 200; // Más rápido (0.2 seg)
+    public static final int VELOCIDAD_MAX_MS = 3000; // Más lento (3 seg)
     
     // ==========================================
     // PERSISTENCIA Y JOURNALING
