@@ -1,6 +1,7 @@
 Vista\DashboardPrincipal$2.class
 Vista\VentanaInicio$2.class
 Controlador\ControladorSistema.class
+Vista\DashboardPrincipal$4.class
 Modelo\Planificador.class
 Modelo\Proceso.class
 Vista\VentanaInicio$1.class
@@ -18,6 +19,7 @@ Vista\VentanaInicio$3.class
 EstructurasDeDatos\NodoArbol.class
 Modelo\Usuario.class
 EstructurasDeDatos\DiscoV.class
+Vista\DashboardPrincipal$3.class
 EstructurasDeDatos\Bloque.class
 Vista\DashboardPrincipal.class
 Controlador\Config.class

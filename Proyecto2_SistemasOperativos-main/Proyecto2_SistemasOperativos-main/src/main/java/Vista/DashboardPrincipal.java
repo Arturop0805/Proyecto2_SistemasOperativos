@@ -55,6 +55,8 @@ public class DashboardPrincipal extends JFrame {
     private JLabel lblCiclo;
     private boolean cicloActivo = false;
     private int cicloContador = 0;
+    private Timer timerCiclo;
+    private JButton btnPausaReanudar;
 
     // Configuración de vista
     private boolean mostrarNumerosBloques = true;
@@ -213,6 +215,7 @@ public class DashboardPrincipal extends JFrame {
         panelIzquierdo.add(scrollArbol, BorderLayout.CENTER);
         add(panelIzquierdo, BorderLayout.WEST);
 
+
         // Barra superior (simula toolbar)
         JPanel panelSuperior = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
         panelSuperior.setBackground(COLOR_FONDO_APP);
@@ -228,6 +231,35 @@ public class DashboardPrincipal extends JFrame {
         JToggleButton btnToggleNumerosBloques = new JToggleButton("Ocultar Números");
         JButton btnCerrarSesionToolbar = new JButton("Cerrar Sesión");
 
+        // Botón de pausa/reanudar
+        btnPausaReanudar = new JButton("Reanudar");
+        estilizarBoton(btnPausaReanudar, COLOR_SECUNDARIO);
+        btnPausaReanudar.setPreferredSize(new Dimension(120, 30));
+        btnPausaReanudar.addActionListener(e -> toggleCiclo());
+
+
+        // Ciclo label
+        lblCiclo = new JLabel("Ciclo: 0");
+        lblCiclo.setForeground(COLOR_TEXTO);
+        lblCiclo.setFont(FUENTE_BOTON);
+        lblCiclo.setPreferredSize(new Dimension(100, 30));
+
+        // Slider de velocidad
+        JSlider sliderVelocidad = new JSlider(JSlider.HORIZONTAL, Config.VELOCIDAD_MIN_MS, Config.VELOCIDAD_MAX_MS, Config.VELOCIDAD_RELOJ_MS);
+        sliderVelocidad.setMajorTickSpacing(1000);
+        sliderVelocidad.setMinorTickSpacing(200);
+        sliderVelocidad.setPaintTicks(true);
+        sliderVelocidad.setPaintLabels(true);
+        sliderVelocidad.setForeground(COLOR_TEXTO);
+        sliderVelocidad.setBackground(COLOR_FONDO_APP);
+        sliderVelocidad.setPreferredSize(new Dimension(200, 40));
+        sliderVelocidad.setToolTipText("Velocidad de ciclo (ms)");
+
+        sliderVelocidad.addChangeListener(e -> {
+            int nuevoDelay = sliderVelocidad.getValue();
+            timerCiclo.setDelay(nuevoDelay);
+        });
+
         btnCerrarSesionToolbar.setBackground(Color.WHITE);
         btnCerrarSesionToolbar.setForeground(Color.BLACK);
         btnCerrarSesionToolbar.setFont(FUENTE_BOTON);
@@ -237,9 +269,11 @@ public class DashboardPrincipal extends JFrame {
         btnCerrarSesionToolbar.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btnCerrarSesionToolbar.setBorder(new EmptyBorder(8, 15, 8, 15));
 
-        JComponent[] toolbarButtons = {btnCrearArchivo, btnCrearCarpeta, btnLeerArchivo, btnRenombrar, btnEliminarArchivo, btnToggleVistaToolbar, btnToggleNumerosBloques, btnCerrarSesionToolbar};
+
+        // Insertar el slider antes del botón de cerrar sesión
+        JComponent[] toolbarButtons = {btnCrearArchivo, btnCrearCarpeta, btnLeerArchivo, btnRenombrar, btnEliminarArchivo, btnToggleVistaToolbar, btnToggleNumerosBloques, btnPausaReanudar, lblCiclo, sliderVelocidad, btnCerrarSesionToolbar};
         for (JComponent b : toolbarButtons) {
-            if (b != btnCerrarSesionToolbar) {
+            if (b instanceof AbstractButton && b != btnCerrarSesionToolbar && b != btnPausaReanudar) {
                 estilizarBoton((AbstractButton) b, COLOR_SECUNDARIO);
             }
             b.setPreferredSize(new Dimension(120, 30));
@@ -261,6 +295,21 @@ public class DashboardPrincipal extends JFrame {
         btnCerrarSesionToolbar.addActionListener(e -> cerrarSesion());
 
         add(panelSuperior, BorderLayout.NORTH);
+
+        // Timer para procesar la cola automáticamente
+        timerCiclo = new Timer(sliderVelocidad.getValue(), e -> {
+            if (cicloActivo) {
+                String resultado = controlador.procesarSiguienteOperacion();
+                if (!resultado.equals("No hay procesos en la cola.")) {
+                    mostrarMensaje(resultado);
+                }
+                cicloContador++;
+                actualizarCiclo();
+                actualizarVistaGlobal();
+            }
+        });
+        timerCiclo.setRepeats(true);
+        timerCiclo.start();
 
         // 2. Panel central con alternancia Disco / Carpeta
         panelCentro = new JPanel();
@@ -425,7 +474,9 @@ public class DashboardPrincipal extends JFrame {
         btnLeer = new JButton("Leer");
         btnModificar = new JButton("Renombrar");
         btnEliminar = new JButton("Eliminar");
-        JComponent[] botones = {btnToggleVista, btnCrear, btnCrearCarpeta, btnLeer, btnModificar, btnEliminar};
+        JButton btnProcesar = new JButton("Procesar Siguiente");
+
+        JComponent[] botones = {btnToggleVista, btnCrear, btnCrearCarpeta, btnLeer, btnModificar, btnEliminar, btnProcesar};
         for (JComponent btn : botones) {
             Color bg = COLOR_PRIMARIO;
             estilizarBoton((AbstractButton) btn, bg);
@@ -580,6 +631,13 @@ public class DashboardPrincipal extends JFrame {
             }
         });
 
+        // PROCESAR SIGUIENTE PROCESO (FIFO)
+        btnProcesar.addActionListener(e -> {
+            String resultado = controlador.procesarSiguienteOperacion();
+            mostrarMensaje(resultado);
+            actualizarVistaGlobal();
+        });
+
         // CERRAR SESIÓN
     }
     
@@ -688,11 +746,16 @@ public class DashboardPrincipal extends JFrame {
 
     private void actualizarCiclo() {
         if (lblCiclo == null) return;
-        if (cicloActivo) {
-            cicloContador++;
-        }
         lblCiclo.setText("Ciclo: " + cicloContador);
+
     }
+
+    // Método para pausar/reanudar el ciclo
+    private void toggleCiclo() {
+        cicloActivo = !cicloActivo;
+        btnPausaReanudar.setText(cicloActivo ? "Pausar" : "Reanudar");
+    }
+    
 
     private void actualizarColaProcesos() {
         if (modeloColaProcesos == null) return;
@@ -828,6 +891,13 @@ public class DashboardPrincipal extends JFrame {
     }
 
     private void actualizarTablaCarpeta() {
+        // Guardar la fila seleccionada antes de actualizar
+        int filaSeleccionada = tablaCarpeta.getSelectedRow();
+        String nombreSeleccionado = null;
+        if (filaSeleccionada != -1) {
+            nombreSeleccionado = (String) modeloTablaCarpeta.getValueAt(filaSeleccionada, 0);
+        }
+
         modeloTablaCarpeta.setRowCount(0);
 
         DefaultMutableTreeNode nodoActual = encontrarNodoPorRuta(carpetaActual);
@@ -835,6 +905,7 @@ public class DashboardPrincipal extends JFrame {
             return;
         }
 
+        int filaRestaurar = -1;
         for (int i = 0; i < nodoActual.getChildCount(); i++) {
             DefaultMutableTreeNode hijo = (DefaultMutableTreeNode) nodoActual.getChildAt(i);
             Object usuario = hijo.getUserObject();
@@ -855,7 +926,15 @@ public class DashboardPrincipal extends JFrame {
                 }
 
                 modeloTablaCarpeta.addRow(new Object[]{nombre, tipo, tamano});
+                // Si el nombre coincide con el que estaba seleccionado, recordar la fila
+                if (nombreSeleccionado != null && nombreSeleccionado.equals(nombre)) {
+                    filaRestaurar = i;
+                }
             }
+        }
+        // Restaurar la selección si corresponde
+        if (filaRestaurar != -1 && filaRestaurar < modeloTablaCarpeta.getRowCount()) {
+            tablaCarpeta.setRowSelectionInterval(filaRestaurar, filaRestaurar);
         }
     }
 

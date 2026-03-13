@@ -47,189 +47,244 @@ public class ControladorSistema {
     // FUNCIONES BÁSICAS DE OPERACIÓN (CRUD)
     // =========================================================================
 
-    public String solicitarCreacionArchivo(String nombreArchivo, int cantidadBloques, String propietario) {
-        
-        // 1. Validar que no exista un archivo con el mismo nombre en la FAT
-        if (fat.buscarArchivo(nombreArchivo) != null) {
-            return "Error: Ya existe un archivo con el nombre '" + nombreArchivo + "'.";
-        }
-        
-        // 2. Validar espacio en disco
-        if (disco.getBloquesLibres() < cantidadBloques) {
-            return "Error: Espacio insuficiente en el disco. Se requieren " + cantidadBloques + " bloques.";
-        }
-
-        // 3. Asignar los bloques en el Disco (Asignación encadenada)
-        Bloque bloqueInicial = disco.asignarBloques(nombreArchivo, cantidadBloques);
-        if (bloqueInicial == null) {
-            return "Error crítico: Fallo al asignar bloques en el disco.";
-        }
-
-        // 4. Registrar en la Tabla de Asignación (FAT)
-        fat.registrarArchivo(nombreArchivo, cantidadBloques, bloqueInicial.getNumeroBloque(), propietario);
-
-        // 5. Crear la solicitud de Entrada/Salida (Proceso) y enviarla al planificador
-        String idProceso = "P" + contadorProcesos++;
-        Proceso nuevoProceso = new Proceso(
-                idProceso, 
-                propietario, 
-                Config.OP_CREATE, 
-                nombreArchivo, 
-                bloqueInicial.getNumeroBloque(), 
-                cantidadBloques
-        );
-        
-        planificador.agregarProceso(nuevoProceso);
-        
-
-        return "Éxito: Solicitud de creación encolada (Proceso " + idProceso + ").";
-    }
-
-    public String solicitarLecturaArchivo(String nombreArchivo, String propietario) {
-        
-        // 1. Buscar en la FAT
-        EntradaFAT entrada = fat.buscarArchivo(nombreArchivo);
-        if (entrada == null) {
-            return "Error: El archivo '" + nombreArchivo + "' no existe.";
-        }
-
-        // NOTA DE PERMISOS: Aquí a futuro debemos validar si el 'propietario' tiene
-        // permisos para leer este archivo basándonos en si es dueño o Administrador.
-
-        // 2. Crear solicitud de E/S
-        String idProceso = "P" + contadorProcesos++;
-        Proceso nuevoProceso = new Proceso(
-                idProceso, 
-                propietario, 
-                Config.OP_READ, 
-                nombreArchivo, 
-                entrada.getDireccionPrimerBloque(), // El cabezal debe ir al inicio del archivo
-                entrada.getCantidadBloques()
-        );
-        
-        planificador.agregarProceso(nuevoProceso);
-        return "Éxito: Solicitud de lectura encolada (Proceso " + idProceso + ").";
-    }
-    public Proceso procesarSiguienteOperacion() {
-        Proceso procesoEjecutado = planificador.obtenerSiguienteProceso();
-        
-        if (procesoEjecutado != null) {
-            // Aquí el proceso ya pasó a estado EJECUCION y la posición del cabezal cambió.
-            // Para el alcance de este simulador, asumimos que al extraerlo, la operación de E/S 
-            // finaliza inmediatamente.
-            procesoEjecutado.terminar();
-            
-            // NOTA JOURNALING: Si la operación era un CREATE o DELETE, 
-            // aquí deberíamos buscar la transacción en el Journal y marcarla como CONFIRMADA.
-            
-            System.out.println("Se ejecutó: " + procesoEjecutado.getOperacion() + 
-                               " sobre " + procesoEjecutado.getArchivoObjetivo() + 
-                               " | Nuevo cabezal: " + planificador.getPosicionCabezal());
-        }
-        
-        return procesoEjecutado; // Se retorna a la Vista para que actualice tablas/gráficas
-    }
-    
     // =========================================================================
-    // LÓGICA DE OPERACIONES CRUD (E/S)
+    // COLA DE PROCESOS (FIFO) Y EJECUCIÓN
     // =========================================================================
 
     /**
-     * OPERACIÓN CREATE: Asigna bloques en el disco y registra en la FAT.
+     * Encola una solicitud de creación de archivo.
+     * La asignación de bloques se realiza cuando se atiende el proceso.
      */
     public String crearArchivo(String nombreArchivo, int tamano) {
         if (tamano <= 0) return "Error: El tamaño debe ser mayor a 0.";
         if (fat.buscarArchivo(nombreArchivo) != null) return "Error: El archivo ya existe.";
         if (disco.getBloquesLibres() < tamano) return "Error: No hay espacio suficiente en el disco.";
-        
-        // Asignación encadenada en el disco
-        Bloque bloqueInicial = disco.asignarBloques(nombreArchivo, tamano);
-        
-        if (bloqueInicial != null) {
-            // Registro en la FAT con propietario
-            fat.registrarArchivo(nombreArchivo, tamano, bloqueInicial.getNumeroBloque(), usuarioActivo.getNombreUsuario());
-            return "Éxito: Archivo '" + nombreArchivo + "' creado con " + tamano + " bloques.";
-        }
-        return "Error: Falla interna al asignar bloques.";
+
+        String idProceso = "P" + contadorProcesos++;
+        Proceso nuevoProceso = new Proceso(
+                idProceso,
+                usuarioActivo.getNombreUsuario(),
+                Config.OP_CREATE,
+                nombreArchivo,
+                planificador.getPosicionCabezal(), // Se usa posición actual del cabezal para ordenar
+                tamano
+        );
+
+        planificador.agregarProceso(nuevoProceso);
+        return "Éxito: Solicitud de creación encolada (Proceso " + idProceso + ").";
     }
 
     /**
-     * OPERACIÓN READ: Verifica que el archivo exista para su lectura.
+     * Encola una solicitud de lectura de archivo.
      */
     public String leerArchivo(String nombreArchivo) {
         EntradaFAT entrada = fat.buscarArchivo(nombreArchivo);
         if (entrada == null) return "Error: El archivo no existe.";
-        
-        // Validar permisos: solo propietario o admin pueden leer
-        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN) && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
+
+        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN)
+                && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
             return "Error: No tienes permisos para leer este archivo.";
         }
-        
-        // Aquí podrías validar permisos de usuario: usuarioActivo.puedeLeerArchivo(...)
-        return "Éxito: Leyendo archivo '" + nombreArchivo + "' (Tamaño: " + entrada.getCantidadBloques() + " bloques).";
+
+        String idProceso = "P" + contadorProcesos++;
+        Proceso nuevoProceso = new Proceso(
+                idProceso,
+                usuarioActivo.getNombreUsuario(),
+                Config.OP_READ,
+                nombreArchivo,
+                entrada.getDireccionPrimerBloque(),
+                entrada.getCantidadBloques()
+        );
+
+        planificador.agregarProceso(nuevoProceso);
+        return "Éxito: Solicitud de lectura encolada (Proceso " + idProceso + ").";
     }
 
     /**
-     * OPERACIÓN DELETE: Libera los bloques encadenados y elimina el registro de la FAT.
+     * Encola una solicitud de eliminación de archivo.
      */
     public String eliminarArchivo(String nombreArchivo) {
         EntradaFAT entrada = fat.buscarArchivo(nombreArchivo);
         if (entrada == null) return "Error: El archivo no existe.";
-        
-        // Validar permisos: solo propietario o admin pueden eliminar
-        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN) && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
+
+        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN)
+                && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
             return "Error: No tienes permisos para eliminar este archivo.";
         }
-        
-        // Obtener el primer bloque y liberar toda la cadena en el disco
-        Bloque bloqueInicial = disco.getBloque(entrada.getDireccionPrimerBloque());
-        disco.liberarBloques(bloqueInicial);
-        
-        // Eliminar de la Tabla de Asignación
-        fat.eliminarArchivo(nombreArchivo);
-        
-        return "Éxito: Archivo '" + nombreArchivo + "' eliminado correctamente.";
+
+        String idProceso = "P" + contadorProcesos++;
+        Proceso nuevoProceso = new Proceso(
+                idProceso,
+                usuarioActivo.getNombreUsuario(),
+                Config.OP_DELETE,
+                nombreArchivo,
+                entrada.getDireccionPrimerBloque(),
+                entrada.getCantidadBloques()
+        );
+
+        planificador.agregarProceso(nuevoProceso);
+        return "Éxito: Solicitud de eliminación encolada (Proceso " + idProceso + ").";
     }
 
     /**
-     * OPERACIÓN UPDATE: Modifica el tamaño de un archivo.
-     * En este simulador básico, lo implementaremos liberando y reasignando (Overwrite).
+     * Encola una solicitud de modificación de archivo (cambio de tamaño).
      */
     public String modificarArchivo(String nombreArchivo, int variacionTamano) {
         EntradaFAT entrada = fat.buscarArchivo(nombreArchivo);
         if (entrada == null) return "Error: El archivo no existe.";
-        
-        // Validar permisos: solo propietario o admin pueden modificar
-        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN) && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
+
+        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN)
+                && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
             return "Error: No tienes permisos para modificar este archivo.";
         }
-        
-        int nuevoTamano = entrada.getCantidadBloques() + variacionTamano;
-        
-        if (nuevoTamano <= 0) {
-            return eliminarArchivo(nombreArchivo); // Si el tamaño es 0 o menor, se elimina
+
+        String idProceso = "P" + contadorProcesos++;
+        Proceso nuevoProceso = new Proceso(
+                idProceso,
+                usuarioActivo.getNombreUsuario(),
+                Config.OP_UPDATE,
+                nombreArchivo,
+                entrada.getDireccionPrimerBloque(),
+                variacionTamano // Usamos el campo "cantidadBloques" para almacenar la variación
+        );
+
+        planificador.agregarProceso(nuevoProceso);
+        return "Éxito: Solicitud de modificación encolada (Proceso " + idProceso + ").";
+    }
+
+    /**
+     * Procesa el siguiente proceso de la cola (FIFO por defecto).
+     */
+    public String procesarSiguienteOperacion() {
+        Proceso procesoEjecutado = planificador.obtenerSiguienteProceso();
+
+        if (procesoEjecutado == null) {
+            return "No hay procesos en la cola.";
         }
-        
-        // 1. Liberar los bloques actuales para evitar fragmentación o falta de espacio fantasma
-        Bloque bloqueInicialViejo = disco.getBloque(entrada.getDireccionPrimerBloque());
-        disco.liberarBloques(bloqueInicialViejo);
-        String propietario = entrada.getPropietario();
-        fat.eliminarArchivo(nombreArchivo);
-        
-        // 2. Intentar crear con el nuevo tamaño
-        if (disco.getBloquesLibres() >= nuevoTamano) {
-            Bloque bloqueInicialNuevo = disco.asignarBloques(nombreArchivo, nuevoTamano);
-            fat.registrarArchivo(nombreArchivo, nuevoTamano, bloqueInicialNuevo.getNumeroBloque(), propietario);
-            return "Éxito: Archivo modificado. Nuevo tamaño: " + nuevoTamano + " bloques.";
-        } else {
-            // Rollback (Recuperación si no hubo espacio para la ampliación)
-            Bloque restaurado = disco.asignarBloques(nombreArchivo, entrada.getCantidadBloques());
-            fat.registrarArchivo(nombreArchivo, entrada.getCantidadBloques(), restaurado.getNumeroBloque(), propietario);
-            return "Error: No hay espacio para la ampliación. Se conservó el tamaño original.";
+
+        String resultado = ejecutarProceso(procesoEjecutado);
+        procesoEjecutado.terminar();
+
+        // NOTA JOURNALING: Si la operación era un CREATE o DELETE,
+        // aquí deberíamos buscar la transacción en el Journal y marcarla como CONFIRMADA.
+
+        System.out.println("Se ejecutó: " + procesoEjecutado.getOperacion() +
+                " sobre " + procesoEjecutado.getArchivoObjetivo() +
+                " | Nuevo cabezal: " + planificador.getPosicionCabezal());
+
+        return resultado;
+    }
+
+    private String ejecutarProceso(Proceso proceso) {
+        switch (proceso.getOperacion()) {
+            case Config.OP_CREATE:
+                return ejecutarCrearProceso(proceso);
+            case Config.OP_READ:
+                return ejecutarLeerProceso(proceso);
+            case Config.OP_DELETE:
+                return ejecutarEliminarProceso(proceso);
+            case Config.OP_UPDATE:
+                return ejecutarModificarProceso(proceso);
+            default:
+                return "Error: Operación desconocida '" + proceso.getOperacion() + "'.";
         }
     }
-    
-    
+
+    private String ejecutarCrearProceso(Proceso proceso) {
+        String nombreArchivo = proceso.getArchivoObjetivo();
+        int tamano = proceso.getCantidadBloques();
+
+        if (fat.buscarArchivo(nombreArchivo) != null) {
+            return "Error: Ya existe un archivo con el nombre '" + nombreArchivo + "'.";
+        }
+
+        if (disco.getBloquesLibres() < tamano) {
+            return "Error: Espacio insuficiente en el disco. Se requieren " + tamano + " bloques.";
+        }
+
+        Bloque bloqueInicial = disco.asignarBloques(nombreArchivo, tamano);
+        if (bloqueInicial == null) {
+            return "Error crítico: Fallo al asignar bloques en el disco.";
+        }
+
+        fat.registrarArchivo(nombreArchivo, tamano, bloqueInicial.getNumeroBloque(), proceso.getPropietario());
+        return "Éxito: Archivo '" + nombreArchivo + "' creado con " + tamano + " bloques.";
+    }
+
+    private String ejecutarLeerProceso(Proceso proceso) {
+        String nombreArchivo = proceso.getArchivoObjetivo();
+        EntradaFAT entrada = fat.buscarArchivo(nombreArchivo);
+        if (entrada == null) {
+            return "Error: El archivo '" + nombreArchivo + "' no existe.";
+        }
+
+        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN)
+                && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
+            return "Error: No tienes permisos para leer este archivo.";
+        }
+
+        return "Éxito: Lectura completa de '" + nombreArchivo + "' (" + entrada.getCantidadBloques() + " bloques).";
+    }
+
+    private String ejecutarEliminarProceso(Proceso proceso) {
+        String nombreArchivo = proceso.getArchivoObjetivo();
+        EntradaFAT entrada = fat.buscarArchivo(nombreArchivo);
+        if (entrada == null) {
+            return "Error: El archivo '" + nombreArchivo + "' no existe.";
+        }
+
+        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN)
+                && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
+            return "Error: No tienes permisos para eliminar este archivo.";
+        }
+
+        Bloque bloqueInicial = disco.getBloque(entrada.getDireccionPrimerBloque());
+        disco.liberarBloques(bloqueInicial);
+        fat.eliminarArchivo(nombreArchivo);
+
+        return "Éxito: Archivo '" + nombreArchivo + "' eliminado correctamente.";
+    }
+
+    private String ejecutarModificarProceso(Proceso proceso) {
+        String nombreArchivo = proceso.getArchivoObjetivo();
+        int variacionTamano = proceso.getCantidadBloques();
+
+        EntradaFAT entrada = fat.buscarArchivo(nombreArchivo);
+        if (entrada == null) {
+            return "Error: El archivo '" + nombreArchivo + "' no existe.";
+        }
+
+        if (!usuarioActivo.getRol().equals(Config.ROL_ADMIN)
+                && !entrada.getPropietario().equals(usuarioActivo.getNombreUsuario())) {
+            return "Error: No tienes permisos para modificar este archivo.";
+        }
+
+        int nuevoTamano = entrada.getCantidadBloques() + variacionTamano;
+        if (nuevoTamano <= 0) {
+            return ejecutarEliminarProceso(proceso);
+        }
+
+        int bloquesDisponibles = disco.getBloquesLibres() + entrada.getCantidadBloques();
+        if (bloquesDisponibles < nuevoTamano) {
+            return "Error: No hay espacio suficiente para la modificación. Se requieren " + nuevoTamano + " bloques en total.";
+        }
+
+        Bloque bloqueInicialViejo = disco.getBloque(entrada.getDireccionPrimerBloque());
+        disco.liberarBloques(bloqueInicialViejo);
+        fat.eliminarArchivo(nombreArchivo);
+
+        Bloque bloqueInicialNuevo = disco.asignarBloques(nombreArchivo, nuevoTamano);
+        if (bloqueInicialNuevo == null) {
+            // Rollback: intentar restaurar tamaño anterior
+            Bloque restaurado = disco.asignarBloques(nombreArchivo, entrada.getCantidadBloques());
+            fat.registrarArchivo(nombreArchivo, entrada.getCantidadBloques(), restaurado.getNumeroBloque(), entrada.getPropietario());
+            return "Error: Falla interna al modificar. Se restauró el tamaño anterior.";
+        }
+
+        fat.registrarArchivo(nombreArchivo, nuevoTamano, bloqueInicialNuevo.getNumeroBloque(), entrada.getPropietario());
+        return "Éxito: Archivo modificado. Nuevo tamaño: " + nuevoTamano + " bloques.";
+    }
+
     // GETTERS
     
     
