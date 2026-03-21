@@ -24,6 +24,11 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
+<<<<<<< HEAD
+=======
+import javax.swing.JList;
+import javax.swing.DefaultListModel;
+>>>>>>> develop
 
 public class DashboardPrincipal extends JFrame {
     
@@ -48,15 +53,27 @@ public class DashboardPrincipal extends JFrame {
     private JTable tablaFAT;
     private DefaultTableModel modeloTablaFAT;
     private JTextArea areaLog;
+<<<<<<< HEAD
     private JTextArea areaJournal;
     private DefaultListModel<String> modeloColaProcesos;
     private JList<String> listaColaProcesos;
+=======
+    private JList<String> listaJournal;
+    private DefaultListModel<String> modeloJournal;
+    private DefaultListModel<String> modeloColaProcesos;
+    private JList<String> listaColaProcesos;
+    private JTextArea areaMovimientos; // Log de movimientos del cabezal por política
+>>>>>>> develop
 
     // Barra de estado / ciclo
     private JLabel lblCiclo;
     private boolean cicloActivo = false;
     private int cicloContador = 0;
+<<<<<<< HEAD
     private Timer timerCiclo;
+=======
+    private Controlador.HiloDisco hiloDisco;
+>>>>>>> develop
     private JButton btnPausaReanudar;
 
     // Configuración de vista
@@ -319,10 +336,17 @@ public class DashboardPrincipal extends JFrame {
             tb.setBorder(new EmptyBorder(5, 10, 5, 10)); tb.setCursor(new Cursor(Cursor.HAND_CURSOR));
         }
         btnX1.setSelected(true); btnX1.setBackground(CV_ON);
+<<<<<<< HEAD
         btnX4.addActionListener(e  -> { timerCiclo.setDelay(Config.VELOCIDAD_X4);  btnX4.setBackground(CV_ON);  btnX2.setBackground(CV_OFF); btnX1.setBackground(CV_OFF); btnX05.setBackground(CV_OFF); });
         btnX2.addActionListener(e  -> { timerCiclo.setDelay(Config.VELOCIDAD_X2);  btnX2.setBackground(CV_ON);  btnX4.setBackground(CV_OFF); btnX1.setBackground(CV_OFF); btnX05.setBackground(CV_OFF); });
         btnX1.addActionListener(e  -> { timerCiclo.setDelay(Config.VELOCIDAD_X1);  btnX1.setBackground(CV_ON);  btnX4.setBackground(CV_OFF); btnX2.setBackground(CV_OFF); btnX05.setBackground(CV_OFF); });
         btnX05.addActionListener(e -> { timerCiclo.setDelay(Config.VELOCIDAD_X05); btnX05.setBackground(CV_ON); btnX4.setBackground(CV_OFF); btnX2.setBackground(CV_OFF); btnX1.setBackground(CV_OFF); });
+=======
+        btnX4.addActionListener(e  -> { hiloDisco.setVelocidadMs(Config.VELOCIDAD_X4);  btnX4.setBackground(CV_ON);  btnX2.setBackground(CV_OFF); btnX1.setBackground(CV_OFF); btnX05.setBackground(CV_OFF); });
+        btnX2.addActionListener(e  -> { hiloDisco.setVelocidadMs(Config.VELOCIDAD_X2);  btnX2.setBackground(CV_ON);  btnX4.setBackground(CV_OFF); btnX1.setBackground(CV_OFF); btnX05.setBackground(CV_OFF); });
+        btnX1.addActionListener(e  -> { hiloDisco.setVelocidadMs(Config.VELOCIDAD_X1);  btnX1.setBackground(CV_ON);  btnX4.setBackground(CV_OFF); btnX2.setBackground(CV_OFF); btnX05.setBackground(CV_OFF); });
+        btnX05.addActionListener(e -> { hiloDisco.setVelocidadMs(Config.VELOCIDAD_X05); btnX05.setBackground(CV_ON); btnX4.setBackground(CV_OFF); btnX2.setBackground(CV_OFF); btnX1.setBackground(CV_OFF); });
+>>>>>>> develop
 
         // Ciclo y Cabeza labels
         lblCiclo = new JLabel("Ciclo: 0");
@@ -339,11 +363,45 @@ public class DashboardPrincipal extends JFrame {
         btnCerrarSesionToolbar.setBorder(new EmptyBorder(5,12,5,12));
         btnCerrarSesionToolbar.addActionListener(e -> cerrarSesion());
 
+<<<<<<< HEAD
         panelSuperior.add(lblModo); panelSuperior.add(rbAdmin); panelSuperior.add(rbUser);
         panelSuperior.add(comboPlanToolbar);
         panelSuperior.add(btnCrearArchivo); panelSuperior.add(btnCrearDir);
         panelSuperior.add(btnLeerArchivo); panelSuperior.add(btnRenombrar); panelSuperior.add(btnEliminarArchivo);
         panelSuperior.add(btnEstadisticas); panelSuperior.add(btnPausaReanudar);
+=======
+        // Cargar JSON
+        JButton btnCargarJSON = new JButton("Cargar JSON");
+        estilizarBoton(btnCargarJSON, new Color(16, 185, 129)); // Verde Esmeralda
+        btnCargarJSON.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos JSON", "json"));
+            int seleccion = fileChooser.showOpenDialog(this);
+            if (seleccion == JFileChooser.APPROVE_OPTION) {
+                String ruta = fileChooser.getSelectedFile().getAbsolutePath();
+                Controlador.ParserJSON parser = new Controlador.ParserJSON(controlador);
+                String msg = parser.cargarCaso(ruta);
+                mostrarMensaje(msg);
+                actualizarVistaGlobal();
+            }
+        });
+
+        panelSuperior.add(lblModo);
+        panelSuperior.add(rbAdmin);
+        panelSuperior.add(rbUser);
+        panelSuperior.add(Box.createHorizontalStrut(10));
+        panelSuperior.add(comboPlanToolbar);
+        panelSuperior.add(Box.createHorizontalStrut(10));
+        panelSuperior.add(btnCargarJSON);
+        panelSuperior.add(btnCrearArchivo);
+        panelSuperior.add(btnCrearDir);
+        panelSuperior.add(btnLeerArchivo);
+        panelSuperior.add(btnRenombrar);
+        panelSuperior.add(btnEliminarArchivo);
+        panelSuperior.add(btnEstadisticas);
+        panelSuperior.add(Box.createHorizontalStrut(10));
+        panelSuperior.add(btnPausaReanudar);
+>>>>>>> develop
         panelSuperior.add(lblVelocidad); panelSuperior.add(btnX4); panelSuperior.add(btnX2);
         panelSuperior.add(btnX1); panelSuperior.add(btnX05);
         panelSuperior.add(lblCiclo); panelSuperior.add(lblCabeza);
@@ -352,6 +410,7 @@ public class DashboardPrincipal extends JFrame {
         setJMenuBar(crearMenuBar());
         add(panelSuperior, BorderLayout.NORTH);
 
+<<<<<<< HEAD
         // Timer para procesar la cola automáticamente
         timerCiclo = new Timer(Config.VELOCIDAD_X1, e -> {
             if (cicloActivo) {
@@ -366,6 +425,20 @@ public class DashboardPrincipal extends JFrame {
         });
         timerCiclo.setRepeats(true);
         timerCiclo.start();
+=======
+        // Hilo en background para procesar E/S
+        hiloDisco = new Controlador.HiloDisco(
+            controlador,
+            Config.VELOCIDAD_X1,
+            (resultado) -> {
+                mostrarMensaje(resultado);
+                cicloContador++;
+                actualizarCiclo();
+            },
+            () -> actualizarVistaGlobal()
+        );
+        hiloDisco.start();
+>>>>>>> develop
 
         // 2. PANEL CENTRAL: TABS (Disco / FAT / Cache)
         JTabbedPane tabsCentro = new JTabbedPane();
@@ -439,6 +512,64 @@ public class DashboardPrincipal extends JFrame {
         listaCache.setFont(FUENTE_BASE);
         tabsCentro.addTab("Cache", new JScrollPane(listaCache));
 
+<<<<<<< HEAD
+=======
+        // 2e. Journal
+        modeloJournal = new DefaultListModel<>();
+        listaJournal = new JList<>(modeloJournal);
+        listaJournal.setBackground(COLOR_PANEL);
+        listaJournal.setForeground(COLOR_TEXTO);
+        listaJournal.setFont(FUENTE_BASE);
+        JPanel pJournal = new JPanel(new BorderLayout());
+        pJournal.add(new JScrollPane(listaJournal), BorderLayout.CENTER);
+        
+        JPanel pJournalBotones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pJournalBotones.setBackground(COLOR_PANEL);
+        JButton btnFallo = new JButton("Simular Fallo");
+        estilizarBoton(btnFallo, new Color(220, 38, 38)); // Red
+        btnFallo.addActionListener(e -> {
+            controlador.setForzarFallo(true);
+            mostrarMensaje("Atención: El próximo CREATE/UPDATE/DELETE fallará a medias.");
+        });
+        JButton btnRecuperar = new JButton("Recuperar Sistema");
+        estilizarBoton(btnRecuperar, new Color(34, 197, 94)); // Green
+        btnRecuperar.addActionListener(e -> {
+            String res = controlador.recuperarFallos();
+            mostrarMensaje(res);
+            actualizarVistaGlobal();
+        });
+        pJournalBotones.add(btnFallo);
+        pJournalBotones.add(btnRecuperar);
+        pJournal.add(pJournalBotones, BorderLayout.SOUTH);
+        
+        tabsCentro.addTab("Journal (Fallos)", pJournal);
+
+        // 2f. Movimientos del Cabezal
+        areaMovimientos = new JTextArea();
+        areaMovimientos.setEditable(false);
+        areaMovimientos.setBackground(new Color(15, 23, 42));
+        areaMovimientos.setForeground(new Color(134, 239, 172)); // Verde claro para resaltar
+        areaMovimientos.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        areaMovimientos.setText("Ejecuta operaciones y la secuencia de movimientos del cabezal aparecera aqui.\n"
+                + "Cambia la politica (FIFO/SSTF/SCAN/C-SCAN) para comparar distancias.");
+
+        JPanel pMovimientos = new JPanel(new BorderLayout());
+        pMovimientos.add(new JScrollPane(areaMovimientos), BorderLayout.CENTER);
+
+        JPanel pMovBotones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        pMovBotones.setBackground(COLOR_PANEL);
+        JButton btnResetMovimientos = new JButton("Resetear Historial");
+        estilizarBoton(btnResetMovimientos, new Color(99, 102, 241)); // Violeta
+        btnResetMovimientos.addActionListener(e -> {
+            controlador.getPlanificador().resetearHistorial();
+            actualizarMovimientos();
+        });
+        pMovBotones.add(btnResetMovimientos);
+        pMovimientos.add(pMovBotones, BorderLayout.SOUTH);
+
+        tabsCentro.addTab("Movimientos Cabezal", pMovimientos);
+
+>>>>>>> develop
         add(tabsCentro, BorderLayout.CENTER);
 
         // 3. PANEL INFERIOR: LOG (IZQ) + COLA (DER)
@@ -573,6 +704,7 @@ public class DashboardPrincipal extends JFrame {
                 BorderFactory.createTitledBorder(null, "Journal", 0, 0, FUENTE_BOTON, COLOR_TEXTO),
                 new EmptyBorder(10, 10, 10, 10)));
 
+<<<<<<< HEAD
         areaJournal = new JTextArea();
         areaJournal.setEditable(false);
         areaJournal.setBackground(COLOR_FONDO_APP);
@@ -580,6 +712,15 @@ public class DashboardPrincipal extends JFrame {
         areaJournal.setFont(FUENTE_BASE);
         areaJournal.setText("Crear Archivo 'doc1': PENDIENTE\nCrear Directorio 'docs': CONFIRMADA\nEliminar 'dosS2': PENDIENTE\n");
         JScrollPane scrollJournal = new JScrollPane(areaJournal);
+=======
+        JTextArea areaJournalLocal = new JTextArea();
+        areaJournalLocal.setEditable(false);
+        areaJournalLocal.setBackground(COLOR_FONDO_APP);
+        areaJournalLocal.setForeground(COLOR_TEXTO);
+        areaJournalLocal.setFont(FUENTE_BASE);
+        areaJournalLocal.setText("Journal y Fallos se encuentran en la pestaña activa superior.");
+        JScrollPane scrollJournal = new JScrollPane(areaJournalLocal);
+>>>>>>> develop
         scrollJournal.setBorder(null);
         panelJournal.add(scrollJournal, BorderLayout.CENTER);
 
@@ -633,9 +774,20 @@ public class DashboardPrincipal extends JFrame {
         btnLeer.addActionListener(e -> {
             String nombre = obtenerNombreArchivoSeleccionado("leer");
             if (nombre != null) {
+<<<<<<< HEAD
                 String resultado = controlador.leerArchivo(nombre);
                 mostrarMensaje(resultado);
                 // Leer no modifica el disco, no es estrictamente necesario actualizar la vista
+=======
+                // Intentar primero con el nombre tal cual, luego con prefijo de carpeta actual si falla
+                String resultado = controlador.leerArchivo(nombre);
+                if (resultado.startsWith("Error") && !nombre.contains("/")) {
+                    // El usuario tecleó sólo el nombre corto; intentamos con la ruta completa
+                    resultado = controlador.leerArchivo(carpetaActual + "/" + nombre);
+                }
+                mostrarMensaje(resultado);
+                actualizarVistaGlobal();
+>>>>>>> develop
             }
         });
 
@@ -842,12 +994,39 @@ public class DashboardPrincipal extends JFrame {
         actualizarTablaFAT();
         actualizarColaProcesos();
         actualizarCiclo();
+<<<<<<< HEAD
         // Siempre actualizamos la vista de carpeta para que refleje cambios aun cuando
         // estemos en la vista de disco o FAT.
         actualizarTablaCarpeta();
         // actualizarArbol();
     }
 
+=======
+        actualizarJournal();
+        actualizarMovimientos();
+        // Siempre actualizamos la vista de carpeta para que refleje cambios aun cuando
+        // estemos en la vista de disco o FAT.
+        actualizarTablaCarpeta();
+        treeModel.reload(); // Sync JTree with FAT after every operation
+        // actualizarArbol();
+    }
+
+    private void actualizarJournal() {
+        if (modeloJournal == null || controlador == null) return;
+        modeloJournal.clear();
+        EstructurasDeDatos.Nodo<EstructurasDeDatos.Transaccion> actual = controlador.getJournal().getInicio();
+        while (actual != null) {
+            modeloJournal.addElement(actual.getDato().toString());
+            actual = actual.getSiguiente();
+        }
+    }
+
+    private void actualizarMovimientos() {
+        if (areaMovimientos == null || controlador == null) return;
+        areaMovimientos.setText(controlador.getPlanificador().getResumenMovimientos());
+    }
+
+>>>>>>> develop
     private void actualizarCiclo() {
         if (lblCiclo == null) return;
         lblCiclo.setText("Ciclo: " + cicloContador);
@@ -857,7 +1036,17 @@ public class DashboardPrincipal extends JFrame {
     // Método para pausar/reanudar el ciclo
     private void toggleCiclo() {
         cicloActivo = !cicloActivo;
+<<<<<<< HEAD
         btnPausaReanudar.setText(cicloActivo ? "Pausar" : "Reanudar");
+=======
+        if (cicloActivo) {
+            hiloDisco.reanudar();
+            btnPausaReanudar.setText("Pausar");
+        } else {
+            hiloDisco.pausar();
+            btnPausaReanudar.setText("Reanudar");
+        }
+>>>>>>> develop
     }
     
 
@@ -892,6 +1081,7 @@ public class DashboardPrincipal extends JFrame {
     }
 
     private void actualizarMapaDisco() {
+<<<<<<< HEAD
         panelDisco.removeAll();
         int capacidad = controlador.getDisco().getCapacidadTotal();
         int ocupados = 0;
@@ -900,6 +1090,18 @@ public class DashboardPrincipal extends JFrame {
             Bloque bloque = controlador.getDisco().getBloque(i);
             JPanel vistaBloque = new JPanel(new BorderLayout());
             vistaBloque.setBorder(BorderFactory.createLineBorder(new Color(75, 85, 99)));
+=======
+        try {
+            panelDisco.removeAll();
+            int capacidad = controlador.getDisco().getCapacidadTotal();
+            int ocupados = 0;
+            
+            for (int i = 0; i < capacidad; i++) {
+                Bloque bloque = controlador.getDisco().getBloque(i);
+                JPanel vistaBloque = new JPanel(new BorderLayout());
+                vistaBloque.setPreferredSize(new Dimension(25, 25)); // FORZAR tamaño para evitar que desaparezca en el Layout
+                vistaBloque.setBorder(BorderFactory.createLineBorder(new Color(75, 85, 99)));
+>>>>>>> develop
 
             if (mostrarNumerosBloques) {
                 JLabel lblNumero = new JLabel(String.format("%02d", i), SwingConstants.CENTER);
@@ -926,11 +1128,23 @@ public class DashboardPrincipal extends JFrame {
                 vistaBloque.setToolTipText("Bloque " + i + " - Libre");
             }
             panelDisco.add(vistaBloque);
+<<<<<<< HEAD
         }
         
         lblBloquesLibres.setText("Bloques libres: " + (capacidad - ocupados) + "/" + capacidad);
         panelDisco.revalidate();
         panelDisco.repaint();
+=======
+            }
+            
+            lblBloquesLibres.setText("Bloques libres: " + (capacidad - ocupados) + "/" + capacidad);
+        } catch (Exception e) {
+            System.err.println("Error al actualizar mapa: " + e.getMessage());
+        } finally {
+            panelDisco.revalidate();
+            panelDisco.repaint();
+        }
+>>>>>>> develop
     }
 
     private void actualizarTablaFAT() {
@@ -1241,6 +1455,12 @@ public class DashboardPrincipal extends JFrame {
     }
 
     private void cerrarSesion() {
+<<<<<<< HEAD
+=======
+        if (hiloDisco != null) {
+            hiloDisco.detener();
+        }
+>>>>>>> develop
         // Volver a la pantalla de inicio de sesión / selección de perfil
         this.dispose();
         VentanaInicio ventanaInicio = new VentanaInicio(controlador);

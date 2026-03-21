@@ -15,6 +15,14 @@ public class EntradaFAT {
     private int cantidadBloques;
     private int direccionPrimerBloque;
     private String propietario;
+<<<<<<< HEAD
+=======
+    
+    // Control de Concurrencia (Reader-Writer Locks)
+    private int contLectores = 0;
+    private java.util.concurrent.Semaphore lockEscritura = new java.util.concurrent.Semaphore(1);
+    private java.util.concurrent.Semaphore lockLectores = new java.util.concurrent.Semaphore(1);
+>>>>>>> develop
 
     public EntradaFAT(String nombreArchivo, int cantidadBloques, int direccionPrimerBloque, String propietario) {
         this.nombreArchivo = nombreArchivo;
@@ -54,4 +62,51 @@ public class EntradaFAT {
     public void setPropietario(String propietario) {
         this.propietario = propietario;
     }
+<<<<<<< HEAD
+=======
+
+    // ===================================
+    // MÉTODOS DE CONCURRENCIA (SEMÁFOROS)
+    // ===================================
+
+    public void adquirirLockLectura() {
+        try {
+            lockLectores.acquire();
+            contLectores++;
+            if (contLectores == 1) {
+                // El primer lector bloquea a los escritores
+                lockEscritura.acquire();
+            }
+            lockLectores.release();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public void liberarLockLectura() {
+        try {
+            lockLectores.acquire();
+            contLectores--;
+            if (contLectores == 0) {
+                // El último lector desbloquea a los escritores
+                lockEscritura.release();
+            }
+            lockLectores.release();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public void adquirirLockEscritura() {
+        try {
+            lockEscritura.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public void liberarLockEscritura() {
+        lockEscritura.release();
+    }
+>>>>>>> develop
 }

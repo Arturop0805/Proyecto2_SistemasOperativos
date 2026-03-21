@@ -11,10 +11,19 @@ import EstructurasDeDatos.TablaAsignacion;
 import EstructurasDeDatos.ArbolNario;
 import EstructurasDeDatos.Bloque;
 import EstructurasDeDatos.EntradaFAT;
+<<<<<<< HEAD
 import Modelo.MetadatoArchivo;
 import Controlador.Config;
 import Modelo.Usuario;
 import EstructurasDeDatos.ListaSimple;
+=======
+import EstructurasDeDatos.ListaSimple;
+import EstructurasDeDatos.Nodo;
+import EstructurasDeDatos.Transaccion;
+import Modelo.MetadatoArchivo;
+import Controlador.Config;
+import Modelo.Usuario;
+>>>>>>> develop
 import java.awt.Color;
 /**
  * Orquestador principal del Simulador de Sistema de Archivos.
@@ -29,21 +38,83 @@ public class ControladorSistema {
     private ArbolNario<MetadatoArchivo> arbolDirectorios;
     private Modelo.Usuario usuarioActivo;
     private ListaSimple<Modelo.Usuario> usuariosSistema;
+<<<<<<< HEAD
+=======
+    private ListaSimple<Transaccion> journal;
+    private int txCounter = 1;
+>>>>>>> develop
     // --- Variables de control ---
     private int contadorProcesos; // Para generar IDs únicos
 
     /**
      * Inicializa el sistema con la capacidad del disco especificada.
      */
+<<<<<<< HEAD
     public ControladorSistema(int CapacidadDisco) {
         this.disco = new DiscoV(CapacidadDisco);
+=======
+    public ControladorSistema() {
+        this.disco = new DiscoV(Config.CAPACIDAD_DISCO_DEFECTO);
+>>>>>>> develop
         this.fat = new TablaAsignacion();
         this.planificador = new Planificador(0); // El cabezal inicia en el bloque 0
         this.arbolDirectorios = new ArbolNario<>(new MetadatoArchivo("Raiz", true, 0)); 
         this.usuariosSistema = new ListaSimple<>();
+<<<<<<< HEAD
         this.contadorProcesos = 1;
     }
 
+=======
+        this.journal = new ListaSimple<>();
+        this.contadorProcesos = 1;
+    }
+
+    private boolean forzarFallo = false;
+    public void setForzarFallo(boolean val) { this.forzarFallo = val; }
+    public boolean isForzarFallo() { return forzarFallo; }
+    public ListaSimple<Transaccion> getJournal() { return journal; }
+
+    public String recuperarFallos() {
+        int recuperadas = 0;
+        Nodo<Transaccion> actual = journal.getInicio();
+        while (actual != null) {
+            Transaccion tx = actual.getDato();
+            if (Transaccion.ESTADO_PENDIENTE.equals(tx.getEstado())) {
+                if (Config.OP_CREATE.equals(tx.getOperacion())) {
+                    EntradaFAT entrada = fat.buscarArchivo(tx.getArchivo());
+                    if (entrada != null) {
+                        Bloque b = disco.getBloque(entrada.getDireccionPrimerBloque());
+                        disco.liberarBloques(b);
+                        fat.eliminarArchivo(tx.getArchivo());
+                    } else if (tx.getBloqueAnterior() > 0) {
+                        Bloque b = disco.getBloque(tx.getBloqueAnterior());
+                        disco.liberarBloques(b);
+                    }
+                } else if (Config.OP_DELETE.equals(tx.getOperacion())) {
+                    EntradaFAT entrada = fat.buscarArchivo(tx.getArchivo());
+                    if (entrada == null && tx.getBloqueAnterior() != 0) {
+                       fat.registrarArchivo(tx.getArchivo(), tx.getTamanoAnterior(), tx.getBloqueAnterior(), tx.getPropietario());
+                    }
+                } else if (Config.OP_UPDATE.equals(tx.getOperacion())) {
+                    EntradaFAT entrada = fat.buscarArchivo(tx.getArchivo());
+                    if (entrada != null) {
+                       Bloque nuevoB = disco.getBloque(entrada.getDireccionPrimerBloque());
+                       disco.liberarBloques(nuevoB);
+                       fat.eliminarArchivo(tx.getArchivo());
+                    }
+                    if (tx.getBloqueAnterior() > 0) {
+                       fat.registrarArchivo(tx.getArchivo(), tx.getTamanoAnterior(), tx.getBloqueAnterior(), tx.getPropietario());
+                    }
+                }
+                tx.setEstado("RECUPERADA");
+                recuperadas++;
+            }
+            actual = actual.getSiguiente();
+        }
+        return "Éxito: Se recuperaron " + recuperadas + " transacciones incompletas.";
+    }
+
+>>>>>>> develop
     // =========================================================================
     // FUNCIONES BÁSICAS DE OPERACIÓN (CRUD)
     // =========================================================================
@@ -191,7 +262,11 @@ public class ControladorSistema {
         }
     }
 
+<<<<<<< HEAD
     private String ejecutarCrearProceso(Proceso proceso) {
+=======
+    public String ejecutarCrearProceso(Proceso proceso) {
+>>>>>>> develop
         String nombreArchivo = proceso.getArchivoObjetivo();
         int tamano = proceso.getCantidadBloques();
 
@@ -203,12 +278,34 @@ public class ControladorSistema {
             return "Error: Espacio insuficiente en el disco. Se requieren " + tamano + " bloques.";
         }
 
+<<<<<<< HEAD
         Bloque bloqueInicial = disco.asignarBloques(nombreArchivo, tamano);
         if (bloqueInicial == null) {
             return "Error crítico: Fallo al asignar bloques en el disco.";
         }
 
         fat.registrarArchivo(nombreArchivo, tamano, bloqueInicial.getNumeroBloque(), proceso.getPropietario());
+=======
+        Transaccion tx = new Transaccion(txCounter++, Config.OP_CREATE, nombreArchivo, 0, 0, proceso.getPropietario());
+        journal.insertarAlFinal(tx);
+
+        Bloque bloqueInicial = disco.asignarBloques(nombreArchivo, tamano);
+        if (bloqueInicial == null) {
+            tx.setEstado("FALLIDA");
+            return "Error crítico: Fallo al asignar bloques en el disco.";
+        }
+        
+        tx.setBloqueAnterior(bloqueInicial.getNumeroBloque());
+        
+        if (forzarFallo) {
+            forzarFallo = false;
+            throw new RuntimeException("Fallo Simulado: Interrupción en creación (Journaling pendiente)");
+        }
+
+        fat.registrarArchivo(nombreArchivo, tamano, bloqueInicial.getNumeroBloque(), proceso.getPropietario());
+        tx.setEstado(Transaccion.ESTADO_CONFIRMADA);
+        
+>>>>>>> develop
         return "Éxito: Archivo '" + nombreArchivo + "' creado con " + tamano + " bloques.";
     }
 
@@ -224,7 +321,16 @@ public class ControladorSistema {
             return "Error: No tienes permisos para leer este archivo.";
         }
 
+<<<<<<< HEAD
         return "Éxito: Lectura completa de '" + nombreArchivo + "' (" + entrada.getCantidadBloques() + " bloques).";
+=======
+        entrada.adquirirLockLectura();
+        try {
+            return "Éxito: Lectura completa de '" + nombreArchivo + "' (" + entrada.getCantidadBloques() + " bloques).";
+        } finally {
+            entrada.liberarLockLectura();
+        }
+>>>>>>> develop
     }
 
     private String ejecutarEliminarProceso(Proceso proceso) {
@@ -239,11 +345,33 @@ public class ControladorSistema {
             return "Error: No tienes permisos para eliminar este archivo.";
         }
 
+<<<<<<< HEAD
         Bloque bloqueInicial = disco.getBloque(entrada.getDireccionPrimerBloque());
         disco.liberarBloques(bloqueInicial);
         fat.eliminarArchivo(nombreArchivo);
 
         return "Éxito: Archivo '" + nombreArchivo + "' eliminado correctamente.";
+=======
+        entrada.adquirirLockEscritura();
+        try {
+            Transaccion tx = new Transaccion(txCounter++, Config.OP_DELETE, nombreArchivo, entrada.getCantidadBloques(), entrada.getDireccionPrimerBloque(), entrada.getPropietario());
+            journal.insertarAlFinal(tx);
+            
+            if (forzarFallo) {
+                forzarFallo = false;
+                throw new RuntimeException("Fallo Simulado: Interrupción antes de eliminar (Journaling pendiente)");
+            }
+
+            Bloque bloqueInicial = disco.getBloque(entrada.getDireccionPrimerBloque());
+            disco.liberarBloques(bloqueInicial);
+            fat.eliminarArchivo(nombreArchivo);
+
+            tx.setEstado(Transaccion.ESTADO_CONFIRMADA);
+            return "Éxito: Archivo '" + nombreArchivo + "' eliminado correctamente.";
+        } finally {
+            entrada.liberarLockEscritura();
+        }
+>>>>>>> develop
     }
 
     private String ejecutarModificarProceso(Proceso proceso) {
@@ -260,6 +388,7 @@ public class ControladorSistema {
             return "Error: No tienes permisos para modificar este archivo.";
         }
 
+<<<<<<< HEAD
         int nuevoTamano = entrada.getCantidadBloques() + variacionTamano;
         if (nuevoTamano <= 0) {
             return ejecutarEliminarProceso(proceso);
@@ -284,6 +413,55 @@ public class ControladorSistema {
 
         fat.registrarArchivo(nombreArchivo, nuevoTamano, bloqueInicialNuevo.getNumeroBloque(), entrada.getPropietario());
         return "Éxito: Archivo modificado. Nuevo tamaño: " + nuevoTamano + " bloques.";
+=======
+        entrada.adquirirLockEscritura();
+        try {
+            int nuevoTamano = entrada.getCantidadBloques() + variacionTamano;
+            if (nuevoTamano <= 0) {
+                Transaccion txDel = new Transaccion(txCounter++, Config.OP_DELETE, nombreArchivo, entrada.getCantidadBloques(), entrada.getDireccionPrimerBloque(), entrada.getPropietario());
+                journal.insertarAlFinal(txDel);
+                
+                Bloque bloqueInicial = disco.getBloque(entrada.getDireccionPrimerBloque());
+                disco.liberarBloques(bloqueInicial);
+                fat.eliminarArchivo(nombreArchivo);
+                
+                txDel.setEstado(Transaccion.ESTADO_CONFIRMADA);
+                return "Éxito: Archivo '" + nombreArchivo + "' eliminado (tamaño pasó a 0 o menor).";
+            }
+
+            int bloquesDisponibles = disco.getBloquesLibres() + entrada.getCantidadBloques();
+            if (bloquesDisponibles < nuevoTamano) {
+                return "Error: No hay espacio suficiente para la modificación. Se requieren " + nuevoTamano + " bloques en total.";
+            }
+
+            Transaccion txUpd = new Transaccion(txCounter++, Config.OP_UPDATE, nombreArchivo, entrada.getCantidadBloques(), entrada.getDireccionPrimerBloque(), entrada.getPropietario());
+            journal.insertarAlFinal(txUpd);
+
+            Bloque bloqueInicialViejo = disco.getBloque(entrada.getDireccionPrimerBloque());
+            disco.liberarBloques(bloqueInicialViejo);
+            fat.eliminarArchivo(nombreArchivo);
+
+            Bloque bloqueInicialNuevo = disco.asignarBloques(nombreArchivo, nuevoTamano);
+            if (bloqueInicialNuevo == null) {
+                // Rollback: intentar restaurar tamaño anterior
+                Bloque restaurado = disco.asignarBloques(nombreArchivo, entrada.getCantidadBloques());
+                fat.registrarArchivo(nombreArchivo, entrada.getCantidadBloques(), restaurado.getNumeroBloque(), entrada.getPropietario());
+                txUpd.setEstado("FALLIDA");
+                return "Error: Falla interna al modificar. Se restauró el tamaño anterior.";
+            }
+
+            if (forzarFallo) {
+                forzarFallo = false;
+                throw new RuntimeException("Fallo Simulado: Interrupción en modficación (Journaling pendiente)");
+            }
+
+            fat.registrarArchivo(nombreArchivo, nuevoTamano, bloqueInicialNuevo.getNumeroBloque(), entrada.getPropietario());
+            txUpd.setEstado(Transaccion.ESTADO_CONFIRMADA);
+            return "Éxito: Archivo modificado. Nuevo tamaño: " + nuevoTamano + " bloques.";
+        } finally {
+            entrada.liberarLockEscritura();
+        }
+>>>>>>> develop
     }
 
     // GETTERS

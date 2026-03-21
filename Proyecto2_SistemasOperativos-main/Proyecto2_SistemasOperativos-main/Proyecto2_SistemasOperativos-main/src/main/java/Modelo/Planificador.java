@@ -19,11 +19,25 @@ public class Planificador {
     private String politicaActiva;
     private boolean direccionArriba; // true para SCAN/C-SCAN ascendente (moviéndose hacia bloques mayores)
 
+<<<<<<< HEAD
+=======
+    // Historial de movimientos del cabezal (para mostrar en la UI y calcular distancias)
+    private ListaSimple<Integer> historialMovimientos;
+    private int distanciaTotalRecorrida;
+
+>>>>>>> develop
     public Planificador(int cabezalInicial) {
         this.colaListos = new ListaSimple<Proceso>();
         this.posicionCabezal = Config.POSICION_INICIAL_CABEZAL;
         this.politicaActiva = Config.POLITICA_DEFECTO;
         this.direccionArriba = true; // Por defecto el cabezal sube
+<<<<<<< HEAD
+=======
+        this.historialMovimientos = new ListaSimple<Integer>();
+        this.distanciaTotalRecorrida = 0;
+        // Registrar posición inicial
+        this.historialMovimientos.insertarAlFinal(this.posicionCabezal);
+>>>>>>> develop
     }
 
 
@@ -61,8 +75,17 @@ public class Planificador {
         Proceso procesoEjecutar = colaListos.obtener(indiceSeleccionado);
         colaListos.eliminarPorIndice(indiceSeleccionado);
         
+<<<<<<< HEAD
         // Actualizamos la posición del cabezal (Simulamos el movimiento del disco)
         this.posicionCabezal = procesoEjecutar.getPosicionDestino();
+=======
+        // Actualizamos la posición del cabezal y registramos el movimiento
+        int posAnterior = this.posicionCabezal;
+        this.posicionCabezal = procesoEjecutar.getPosicionDestino();
+        int distancia = Math.abs(this.posicionCabezal - posAnterior);
+        this.distanciaTotalRecorrida += distancia;
+        this.historialMovimientos.insertarAlFinal(this.posicionCabezal);
+>>>>>>> develop
         procesoEjecutar.ejecutar();
         
         return procesoEjecutar;
@@ -148,10 +171,51 @@ public class Planificador {
     public void setPosicionCabezal(int posicionCabezal) { this.posicionCabezal = posicionCabezal; }
     
     public String getPoliticaActiva() { return politicaActiva; }
+<<<<<<< HEAD
     public void setPoliticaActiva(String politicaActiva) { this.politicaActiva = politicaActiva; }
+=======
+    public void setPoliticaActiva(String politicaActiva) {
+        this.politicaActiva = politicaActiva;
+        // Al cambiar política, resetear historial para mostrar resultados limpios
+        resetearHistorial();
+    }
+>>>>>>> develop
 
     public boolean isDireccionArriba() { return direccionArriba; }
     public void setDireccionArriba(boolean direccionArriba) { this.direccionArriba = direccionArriba; }
     
     public ListaSimple<Proceso> getColaListos() { return colaListos; }
+<<<<<<< HEAD
+=======
+
+    // --- HISTORIAL DE MOVIMIENTOS ---
+    public ListaSimple<Integer> getHistorialMovimientos() { return historialMovimientos; }
+    public int getDistanciaTotalRecorrida() { return distanciaTotalRecorrida; }
+
+    /**
+     * Resetea el historial de movimientos para comenzar una nueva simulación de política.
+     */
+    public void resetearHistorial() {
+        this.historialMovimientos = new ListaSimple<Integer>();
+        this.distanciaTotalRecorrida = 0;
+        this.historialMovimientos.insertarAlFinal(this.posicionCabezal);
+    }
+
+    /**
+     * Genera un resumen legible del historial de movimientos del cabezal.
+     */
+    public String getResumenMovimientos() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== Política: ").append(politicaActiva).append(" ===\n");
+        sb.append("Secuencia: ");
+        EstructurasDeDatos.Nodo<Integer> actual = historialMovimientos.getInicio();
+        while (actual != null) {
+            sb.append(actual.getDato());
+            if (actual.getSiguiente() != null) sb.append(" → ");
+            actual = actual.getSiguiente();
+        }
+        sb.append("\nDistancia total recorrida: ").append(distanciaTotalRecorrida).append(" bloques\n");
+        return sb.toString();
+    }
+>>>>>>> develop
 }

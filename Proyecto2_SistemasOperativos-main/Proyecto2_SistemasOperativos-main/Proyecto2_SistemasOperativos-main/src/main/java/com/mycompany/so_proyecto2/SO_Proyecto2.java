@@ -12,7 +12,11 @@ import Modelo.Usuario;
 public class SO_Proyecto2 {
     public static void main(String[] args) {
         // 1. Crear el orquestador del sistema con la capacidad del disco (ej. 1024 bloques)
+<<<<<<< HEAD
         ControladorSistema controlador = new ControladorSistema(Config.CAPACIDAD_DISCO_DEFECTO);
+=======
+        ControladorSistema controlador = new ControladorSistema();
+>>>>>>> develop
 
         // 2. Agregar un usuario administrador por defecto
         controlador.agregarUsuario(new Usuario("Admin_1", "", Config.ROL_ADMIN));

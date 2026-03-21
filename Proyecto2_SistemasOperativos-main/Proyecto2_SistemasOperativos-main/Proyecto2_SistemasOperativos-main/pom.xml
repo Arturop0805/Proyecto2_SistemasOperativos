@@ -12,6 +12,16 @@
         <maven.compiler.release>21</maven.compiler.release>
         <exec.mainClass>com.mycompany.so_proyecto2.SO_Proyecto2</exec.mainClass>
     </properties>
+<<<<<<< HEAD
+=======
+    <dependencies>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20231013</version>
+        </dependency>
+    </dependencies>
+>>>>>>> develop
     <build>
         <plugins>
             <plugin>

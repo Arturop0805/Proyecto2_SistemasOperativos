@@ -123,6 +123,13 @@ public class ListaSimple<T> {
         return tamano;
     }
 
+<<<<<<< HEAD
+=======
+    public Nodo<T> getInicio() {
+        return cabeza;
+    }
+
+>>>>>>> develop
     /**
      * Imprime todos los elementos de la lista en orden.
      */
