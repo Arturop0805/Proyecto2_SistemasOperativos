@@ -1,0 +1,38 @@
+{
+  "caso": "P_WINDOWS_COMPLEX",
+  "descripcion": "Simulacion de un entorno de SO complejo con archivos pre-cargados en multiples niveles de carpetas y una alta concurrencia de E/S.",
+  "initial_head": 0,
+  "system_files": [
+    { "name": "SSD/Windows/system.sys", "size": 5 },
+    { "name": "SSD/Windows/System32/kernel.bin", "size": 12 },
+    { "name": "SSD/Windows/System32/drivers/ntfs.sys", "size": 8 },
+    { "name": "SSD/Windows/System32/drivers/tcpip.sys", "size": 6 },
+    { "name": "SSD/Program Files/Steam/steam.exe", "size": 25 },
+    { "name": "SSD/Program Files/Steam/steamapps/common/Hollow Knight/hollow_knight.exe", "size": 45 },
+    { "name": "SSD/Program Files/Steam/steamapps/common/Hollow Knight/resources.assets", "size": 120 },
+    { "name": "SSD/Program Files/Microsoft Office/word.exe", "size": 30 },
+    { "name": "SSD/Program Files/Microsoft Office/excel.exe", "size": 35 },
+    { "name": "SSD/Users/Admin_1/AppData/Local/config.cfg", "size": 2 },
+    { "name": "SSD/Users/Admin_1/Documents/claves_servidor.txt", "size": 1 },
+    { "name": "SSD/Users/User_Publico/Documents/reporte_mensual.docx", "size": 15 },
+    { "name": "SSD/Users/User_Publico/Pictures/vacaciones_2025.jpg", "size": 8 },
+    { "name": "SSD/Users/User_Publico/Videos/tutorial_java.mp4", "size": 85 }
+  ],
+  "requests": [
+    { "type": "READ",   "name": "SSD/Windows/System32/kernel.bin", "user": "Admin_1", "size": 0 },
+    { "type": "READ",   "name": "SSD/Windows/System32/drivers/tcpip.sys", "user": "Admin_1", "size": 0 },
+    { "type": "CREATE", "name": "SSD/Users/User_Publico/Documents/proyecto_final.pdf", "user": "User_Publico", "size": 18 },
+    { "type": "CREATE", "name": "SSD/Program Files/Steam/steamapps/common/Hollow Knight/save_slot_1.dat", "user": "User_Publico", "size": 4 },
+    { "type": "READ",   "name": "SSD/Program Files/Steam/steam.exe", "user": "User_Publico", "size": 0 },
+    { "type": "UPDATE", "name": "SSD/Users/Admin_1/AppData/Local/config.cfg", "user": "Admin_1", "size": 3 },
+    { "type": "CREATE", "name": "SSD/Windows/Temp/cache_temporal.tmp", "user": "Admin_1", "size": 10 },
+    { "type": "READ",   "name": "SSD/Users/Admin_1/Documents/claves_servidor.txt", "user": "Admin_1", "size": 0 },
+    { "type": "DELETE", "name": "SSD/Users/User_Publico/Pictures/vacaciones_2025.jpg", "user": "User_Publico", "size": 0 },
+    { "type": "CREATE", "name": "SSD/Users/User_Publico/Downloads/juego_nuevo.zip", "user": "User_Publico", "size": 60 },
+    { "type": "READ",   "name": "SSD/Program Files/Microsoft Office/word.exe", "user": "Admin_1", "size": 0 },
+    { "type": "UPDATE", "name": "SSD/Users/User_Publico/Documents/reporte_mensual.docx", "user": "User_Publico", "size": 5 },
+    { "type": "READ",   "name": "SSD/Program Files/Steam/steamapps/common/Hollow Knight/hollow_knight.exe", "user": "User_Publico", "size": 0 },
+    { "type": "DELETE", "name": "SSD/Windows/Temp/cache_temporal.tmp", "user": "Admin_1", "size": 0 },
+    { "type": "CREATE", "name": "SSD/Users/Admin_1/Desktop/acceso_directo.lnk", "user": "Admin_1", "size": 1 }
+  ]
+}
