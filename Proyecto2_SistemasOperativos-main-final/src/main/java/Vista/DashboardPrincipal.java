@@ -10,6 +10,7 @@ import EstructurasDeDatos.Bloque;
 import EstructurasDeDatos.EntradaFAT;
 import Modelo.Proceso;
 import Modelo.Estado;
+import Modelo.Planificador;
 
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -62,6 +63,20 @@ public class DashboardPrincipal extends JFrame {
     private JList<String> listaColaProcesos;
     private JTextArea areaMovimientos; // Log de movimientos del cabezal por política
 
+    // Nuevas listas para las 4 colas
+    private DefaultListModel<String> modeloListos;
+    private JList<String> listaListos;
+    private DefaultListModel<String> modeloColaIO;
+    private JList<String> listaColaIO;
+    private DefaultListModel<String> modeloIOEnEjecucion;
+    private JList<String> listaIOEnEjecucion;
+    private DefaultListModel<String> modeloBloqueados;
+    private JList<String> listaBloqueados;
+
+    // Panel para CPU en grande
+    private JPanel panelCPU;
+    private JLabel lblProcesoCPU;
+
     // Barra de estado / ciclo
     private JLabel lblCiclo;
     private boolean cicloActivo = false;
@@ -90,6 +105,7 @@ public class DashboardPrincipal extends JFrame {
     private JButton btnCrearCarpeta;
     private JButton btnLeer;
     private JButton btnModificar;
+    private JButton btnRenombrar;
     private JButton btnEliminar;
 
     // --- COLORES / ESTILO ---
@@ -310,14 +326,23 @@ public class DashboardPrincipal extends JFrame {
         JButton btnRenombrar       = new JButton("Renombrar");
         JButton btnEliminarArchivo = new JButton("Eliminar");
         JButton btnEstadisticas    = new JButton("Estadísticas");
+
+        // Vincular botones de la barra superior con los campos de instancia para evitar NPE en código legacy
+        this.btnCrear = btnCrearArchivo;
+        this.btnCrearCarpeta = btnCrearDir;
+        this.btnLeer = btnLeerArchivo;
+        this.btnModificar = btnRenombrar;
+        this.btnRenombrar = btnRenombrar;
+        this.btnEliminar = btnEliminarArchivo;
+
         for (JButton b : new JButton[]{btnCrearArchivo,btnCrearDir,btnLeerArchivo,btnRenombrar,btnEliminarArchivo})
             estilizarBoton(b, COLOR_SECUNDARIO);
         estilizarBoton(btnEstadisticas, new Color(124, 58, 237));
         btnCrearArchivo.addActionListener(e    -> crearArchivoEnCarpetaActual());
         btnCrearDir.addActionListener(e        -> crearDirectorioEnCarpetaActual());
-        btnLeerArchivo.addActionListener(e     -> btnLeer.doClick());
-        btnRenombrar.addActionListener(e       -> btnModificar.doClick());
-        btnEliminarArchivo.addActionListener(e -> btnEliminar.doClick());
+        btnLeerArchivo.addActionListener(e     -> leerArchivoSeleccionado());
+        btnRenombrar.addActionListener(e       -> renombrarElementoSeleccionado());
+        btnEliminarArchivo.addActionListener(e -> eliminarArchivoSeleccionado());
         btnEstadisticas.addActionListener(e    -> mostrarEstadisticas());
 
         // Pausa / Reanudar
@@ -361,6 +386,24 @@ public class DashboardPrincipal extends JFrame {
         btnCerrarSesionToolbar.setBorder(new EmptyBorder(5,12,5,12));
         btnCerrarSesionToolbar.addActionListener(e -> cerrarSesion());
 
+        // Formatear disco (botón superior derecho)
+        JButton btnFormatearDisco = new JButton("Formatear Disco");
+        btnFormatearDisco.setBackground(new Color(239, 68, 68)); btnFormatearDisco.setForeground(Color.WHITE);
+        btnFormatearDisco.setFont(FUENTE_BOTON); btnFormatearDisco.setFocusPainted(false);
+        btnFormatearDisco.setBorderPainted(false); btnFormatearDisco.setOpaque(true);
+        btnFormatearDisco.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnFormatearDisco.setBorder(new EmptyBorder(5, 12, 5, 12));
+        btnFormatearDisco.addActionListener(e -> {
+            int confirmacion = JOptionPane.showConfirmDialog(this,
+                    "¿Confirmas formatear el disco y borrar todo? Solo quedará la carpeta raíz SSD.",
+                    "Formatear Disco", JOptionPane.YES_NO_OPTION);
+            if (confirmacion == JOptionPane.YES_OPTION) {
+                String resultado = controlador.formatearDisco();
+                mostrarMensaje(resultado);
+                actualizarVistaGlobal();
+            }
+        });
+
         // Cargar JSON
         JButton btnCargarJSON = new JButton("Cargar JSON");
         estilizarBoton(btnCargarJSON, new Color(16, 185, 129)); // Verde Esmeralda
@@ -395,6 +438,7 @@ public class DashboardPrincipal extends JFrame {
         panelSuperior.add(lblVelocidad); panelSuperior.add(btnX4); panelSuperior.add(btnX2);
         panelSuperior.add(btnX1); panelSuperior.add(btnX05);
         panelSuperior.add(lblCiclo); panelSuperior.add(lblCabeza);
+        panelSuperior.add(btnFormatearDisco);
         panelSuperior.add(btnCerrarSesionToolbar);
 
         // Toggle para notificaciones
@@ -597,17 +641,17 @@ public class DashboardPrincipal extends JFrame {
         tabsCentro.addTab("Movimientos Cabezal", pMovimientos);
         add(tabsCentro, BorderLayout.CENTER);
 
-        // 3. PANEL INFERIOR: LOG (IZQ) + COLA (DER)
+        // 3. PANEL INFERIOR: LOG (IZQ) + PROCESO EN CPU (DER)
         JPanel panelInferior = new JPanel(new GridLayout(1, 2, 10, 0));
         panelInferior.setBackground(COLOR_FONDO_APP);
         panelInferior.setPreferredSize(new Dimension(0, 200));
         panelInferior.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-        // Log
+        // Log de eventos (izquierda)
         areaLog = new JTextArea();
         areaLog.setEditable(false);
         areaLog.setFont(FUENTE_BASE);
-        areaLog.setBackground(new Color(15, 23, 42));
+        areaLog.setBackground(COLOR_FONDO_APP);
         areaLog.setForeground(COLOR_TEXTO);
         JButton btnLimpiarLog = new JButton("Limpiar");
         estilizarBoton(btnLimpiarLog, COLOR_PANEL);
@@ -617,280 +661,77 @@ public class DashboardPrincipal extends JFrame {
         pLog.add(new JScrollPane(areaLog), BorderLayout.CENTER);
         pLog.add(btnLimpiarLog, BorderLayout.SOUTH);
 
-        // Cola
-        modeloColaProcesos = new DefaultListModel<>();
-        listaColaProcesos = new JList<>(modeloColaProcesos);
-        listaColaProcesos.setBackground(new Color(15, 23, 42));
-        listaColaProcesos.setForeground(COLOR_TEXTO);
-        listaColaProcesos.setFont(FUENTE_BASE);
-        JPanel pCola = new JPanel(new BorderLayout());
-        pCola.setBorder(BorderFactory.createTitledBorder(null, "Cola de Procesos", 0, 0, FUENTE_BOTON, COLOR_TEXTO));
-        pCola.add(new JScrollPane(listaColaProcesos), BorderLayout.CENTER);
+        // Panel para CPU en grande (derecha)
+        panelCPU = new JPanel();
+        panelCPU.setBackground(COLOR_PANEL);
+        panelCPU.setBorder(BorderFactory.createTitledBorder(null, "Proceso en CPU", 0, 0, FUENTE_TITULO, COLOR_TEXTO));
+        panelCPU.setLayout(new BorderLayout());
+
+        lblProcesoCPU = new JLabel("NINGÚN PROCESO EN EJECUCIÓN", SwingConstants.CENTER);
+        lblProcesoCPU.setForeground(COLOR_PRIMARIO);
+        lblProcesoCPU.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        panelCPU.add(lblProcesoCPU, BorderLayout.CENTER);
 
         panelInferior.add(pLog);
-        panelInferior.add(pCola);
+        panelInferior.add(panelCPU);
         add(panelInferior, BorderLayout.SOUTH);
 
         mostrarVistaDisco();
     }
 
     // =========================================================================
-    // NUEVO: PANEL DE OPERACIONES CRUD
+    // NUEVO: PANEL DE COLAS (4 paneles)
     // =========================================================================
     private void inicializarPanelOperaciones() {
-        JPanel panelOperaciones = new JPanel(new BorderLayout());
+        JPanel panelOperaciones = new JPanel(new GridLayout(4, 1, 0, 5));
         panelOperaciones.setPreferredSize(new Dimension(260, 0));
         panelOperaciones.setBackground(COLOR_FONDO_APP);
-        panelOperaciones.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder(null, "Controles", 0, 0, FUENTE_TITULO, COLOR_TEXTO),
-                new EmptyBorder(12, 12, 12, 12)));
+        panelOperaciones.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-        // Información de usuario y planificador
-        JPanel panelInfo = new JPanel();
-        panelInfo.setLayout(new BoxLayout(panelInfo, BoxLayout.Y_AXIS));
-        panelInfo.setBackground(COLOR_PANEL);
-        panelInfo.setBorder(new EmptyBorder(10, 10, 10, 10));
+        // Panel 1: Listos
+        modeloListos = new DefaultListModel<>();
+        listaListos = new JList<>(modeloListos);
+        listaListos.setBackground(COLOR_PANEL);
+        listaListos.setForeground(COLOR_TEXTO);
+        listaListos.setFont(FUENTE_BASE);
+        JScrollPane scrollListos = new JScrollPane(listaListos);
+        scrollListos.setBorder(BorderFactory.createTitledBorder(null, "LISTOS", 0, 0, FUENTE_BOTON, Color.BLACK));
+        panelOperaciones.add(scrollListos);
 
-        JLabel lblUsuario = new JLabel("Usuario: " + controlador.getUsuarioActivo().getNombreUsuario());
-        lblUsuario.setForeground(COLOR_TEXTO);
-        lblUsuario.setFont(FUENTE_BASE);
-        panelInfo.add(lblUsuario);
+        // Panel 2: Cola I/O
+        modeloColaIO = new DefaultListModel<>();
+        listaColaIO = new JList<>(modeloColaIO);
+        listaColaIO.setBackground(COLOR_PANEL);
+        listaColaIO.setForeground(COLOR_TEXTO);
+        listaColaIO.setFont(FUENTE_BASE);
+        JScrollPane scrollColaIO = new JScrollPane(listaColaIO);
+        scrollColaIO.setBorder(BorderFactory.createTitledBorder(null, "I/O COLA", 0, 0, FUENTE_BOTON, Color.BLACK));
+        panelOperaciones.add(scrollColaIO);
 
-        JLabel lblRol = new JLabel("Rol: " + controlador.getUsuarioActivo().getRol());
-        lblRol.setForeground(COLOR_TEXTO);
-        lblRol.setFont(FUENTE_BASE);
-        panelInfo.add(lblRol);
+        // Panel 3: I/O en Ejecución
+        modeloIOEnEjecucion = new DefaultListModel<>();
+        listaIOEnEjecucion = new JList<>(modeloIOEnEjecucion);
+        listaIOEnEjecucion.setBackground(COLOR_PANEL);
+        listaIOEnEjecucion.setForeground(COLOR_TEXTO);
+        listaIOEnEjecucion.setFont(FUENTE_BASE);
+        JScrollPane scrollIOEnEjecucion = new JScrollPane(listaIOEnEjecucion);
+        scrollIOEnEjecucion.setBorder(BorderFactory.createTitledBorder(null, "I/O EJECUCION", 0, 0, FUENTE_BOTON, Color.BLACK));
+        panelOperaciones.add(scrollIOEnEjecucion);
 
-        // (Se eliminó el botón para cambiar entre administrador y usuario)
-
-        panelInfo.add(Box.createRigidArea(new Dimension(0, 10)));
-
-        JLabel lblPlanificador = new JLabel("Planificador:");
-        lblPlanificador.setForeground(COLOR_TEXTO);
-        lblPlanificador.setFont(FUENTE_BASE);
-        panelInfo.add(lblPlanificador);
-
-        JComboBox<String> comboPlanificador = new JComboBox<>(new String[] {"FIFO", "SSTF", "SCAN", "C-SCAN"});
-        comboPlanificador.setBackground(COLOR_FONDO_APP);
-        comboPlanificador.setForeground(COLOR_TEXTO);
-        comboPlanificador.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-        comboPlanificador.setFocusable(false);
-        comboPlanificador.setSelectedItem(controlador.getPlanificador().getPoliticaActiva());
-        comboPlanificador.addActionListener(e -> {
-            String seleccion = (String) comboPlanificador.getSelectedItem();
-            controlador.getPlanificador().setPoliticaActiva(seleccion);
-        });
-        panelInfo.add(comboPlanificador);
-
-        panelOperaciones.add(panelInfo, BorderLayout.NORTH);
-
-        // Botones de acción
-        JPanel panelBotones = new JPanel();
-        panelBotones.setBackground(COLOR_PANEL);
-        panelBotones.setLayout(new BoxLayout(panelBotones, BoxLayout.Y_AXIS));
-        panelBotones.setBorder(new EmptyBorder(10, 10, 10, 10));
-
-        btnToggleVista = new JToggleButton("Ver Carpetas");
-        btnCrear = new JButton("Crear Archivo");
-        btnCrearCarpeta = new JButton("Crear Carpeta");
-        btnLeer = new JButton("Leer");
-        btnModificar = new JButton("Renombrar");
-        btnEliminar = new JButton("Eliminar");
-        JButton btnProcesar = new JButton("Procesar Siguiente");
-
-        JComponent[] botones = {btnToggleVista, btnCrear, btnCrearCarpeta, btnLeer, btnModificar, btnEliminar, btnProcesar};
-        for (JComponent btn : botones) {
-            Color bg = COLOR_PRIMARIO;
-            estilizarBoton((AbstractButton) btn, bg);
-            btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-            btn.setMaximumSize(new Dimension(220, 40));
-            panelBotones.add(Box.createRigidArea(new Dimension(0, 10)));
-            panelBotones.add(btn);
-        }
-
-        // Toggle de vista Disco / Carpeta
-        btnToggleVista.addActionListener(e -> {
-            if (btnToggleVista.isSelected()) {
-                btnToggleVista.setText("Ver Disco");
-                mostrarVistaCarpeta();
-            } else {
-                btnToggleVista.setText("Ver Carpetas");
-                mostrarVistaDisco();
-            }
-            actualizarVistaGlobal();
-        });
-
-        panelOperaciones.add(panelBotones, BorderLayout.CENTER);
-
-        // Journal (estilo)
-        JPanel panelJournal = new JPanel(new BorderLayout());
-        panelJournal.setBackground(COLOR_PANEL);
-        panelJournal.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder(null, "Journal", 0, 0, FUENTE_BOTON, COLOR_TEXTO),
-                new EmptyBorder(10, 10, 10, 10)));
-
-        JTextArea areaJournalLocal = new JTextArea();
-        areaJournalLocal.setEditable(false);
-        areaJournalLocal.setBackground(COLOR_FONDO_APP);
-        areaJournalLocal.setForeground(COLOR_TEXTO);
-        areaJournalLocal.setFont(FUENTE_BASE);
-        areaJournalLocal.setText("Journal y Fallos se encuentran en la pestaña activa superior.");
-        JScrollPane scrollJournal = new JScrollPane(areaJournalLocal);
-        scrollJournal.setBorder(null);
-        panelJournal.add(scrollJournal, BorderLayout.CENTER);
-
-        // Estado sistema
-        JButton btnSimularFallo = new JButton("Simular Fallo");
-        estilizarBoton(btnSimularFallo, COLOR_ALERTA);
-        btnSimularFallo.addActionListener(e -> {
-            mostrarMensaje("Fallo simulado. Revise el Journal para deshacer operaciones PENDIENTES.");
-        });
-
-        JLabel lblEstado = new JLabel("Estado del Sistema: Normal");
-        lblEstado.setForeground(COLOR_TEXTO);
-        lblEstado.setFont(FUENTE_BASE);
-
-        JPanel panelJournalFooter = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        panelJournalFooter.setBackground(COLOR_PANEL);
-        panelJournalFooter.add(btnSimularFallo);
-        panelJournalFooter.add(lblEstado);
-        panelJournal.add(panelJournalFooter, BorderLayout.SOUTH);
-
-        // Cola de Procesos
-        JPanel panelCola = new JPanel(new BorderLayout());
-        panelCola.setBackground(COLOR_PANEL);
-        panelCola.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder(null, "Cola de Procesos", 0, 0, FUENTE_BOTON, COLOR_TEXTO),
-                new EmptyBorder(10, 10, 10, 10)));
-
-        modeloColaProcesos = new DefaultListModel<>();
-        listaColaProcesos = new JList<>(modeloColaProcesos);
-        listaColaProcesos.setBackground(COLOR_FONDO_APP);
-        listaColaProcesos.setForeground(COLOR_TEXTO);
-        listaColaProcesos.setFont(FUENTE_BASE);
-        JScrollPane scrollCola = new JScrollPane(listaColaProcesos);
-        scrollCola.setBorder(null);
-        panelCola.add(scrollCola, BorderLayout.CENTER);
-
-        panelOperaciones.add(panelJournal, BorderLayout.CENTER);
-        panelOperaciones.add(panelCola, BorderLayout.SOUTH);
+        // Panel 4: Bloqueados
+        modeloBloqueados = new DefaultListModel<>();
+        listaBloqueados = new JList<>(modeloBloqueados);
+        listaBloqueados.setBackground(COLOR_PANEL);
+        listaBloqueados.setForeground(COLOR_TEXTO);
+        listaBloqueados.setFont(FUENTE_BASE);
+        JScrollPane scrollBloqueados = new JScrollPane(listaBloqueados);
+        scrollBloqueados.setBorder(BorderFactory.createTitledBorder(null, "BLOQUEADOS", 0, 0, FUENTE_BOTON, Color.BLACK));
+        panelOperaciones.add(scrollBloqueados);
 
         add(panelOperaciones, BorderLayout.EAST);
-
-        // --- EVENTOS CRUD ---
-
-        // CREATE Archivo
-        btnCrear.addActionListener(e -> crearArchivoEnCarpetaActual());
-
-        // CREATE Carpeta
-        btnCrearCarpeta.addActionListener(e -> crearDirectorioEnCarpetaActual());
-
-        // READ
-        btnLeer.addActionListener(e -> {
-            String nombre = obtenerNombreArchivoSeleccionado("leer");
-            if (nombre != null) {
-                // Intentar primero con el nombre tal cual, luego con prefijo de carpeta actual si falla
-                String resultado = controlador.leerArchivo(nombre);
-                if (resultado.startsWith("Error") && !nombre.contains("/")) {
-                    // El usuario tecleó sólo el nombre corto; intentamos con la ruta completa
-                    resultado = controlador.leerArchivo(carpetaActual + "/" + nombre);
-                }
-                mostrarMensaje(resultado);
-                actualizarVistaGlobal();
-            }
-        });
-
-        // UPDATE
-        btnModificar.addActionListener(e -> {
-            String nombre = obtenerNombreArchivoSeleccionado("modificar");
-            if (nombre != null) {
-                String strVariacion = JOptionPane.showInputDialog(this, 
-                        "Ingrese variación de bloques (Ej: '2' para agregar, '-1' para quitar):");
-                if (strVariacion != null) {
-                    try {
-                        int modificacion = Integer.parseInt(strVariacion);
-                        String resultado = controlador.modificarArchivo(nombre, modificacion);
-                        mostrarMensaje(resultado);
-                        actualizarVistaGlobal();
-                    } catch (NumberFormatException ex) {
-                        JOptionPane.showMessageDialog(this, "Cantidad inválida.", "Error", JOptionPane.ERROR_MESSAGE);
-                    }
-                }
-            }
-        });
-
-        // DELETE
-        btnEliminar.addActionListener(e -> {
-            if (isVistaCarpeta()) {
-                int filaSeleccionada = tablaCarpeta.getSelectedRow();
-                if (filaSeleccionada != -1) {
-                    String nombre = (String) modeloTablaCarpeta.getValueAt(filaSeleccionada, 0);
-                    String tipo = (String) modeloTablaCarpeta.getValueAt(filaSeleccionada, 1);
-                    int confirmacion = JOptionPane.showConfirmDialog(this,
-                            "¿Está seguro de eliminar el " + ("Carpeta".equals(tipo) ? "carpeta" : "archivo") + " '" + nombre + "'?",
-                            "Confirmar Eliminación", JOptionPane.YES_NO_OPTION);
-                    if (confirmacion == JOptionPane.YES_OPTION) {
-                        if ("Carpeta".equals(tipo)) {
-                            eliminarRamaCarpeta(nombre);
-                        } else {
-                            String ruta = carpetaActual + "/" + nombre;
-                            String resultado = controlador.eliminarArchivo(ruta);
-                            mostrarMensaje(resultado);
-                            if (!resultado.startsWith("Error")) {
-                                eliminarElementoEnCarpeta(nombre, false);
-                            }
-                        }
-                        actualizarVistaGlobal();
-                    }
-                } else {
-                    mostrarMensaje("Seleccione un elemento en la vista de carpeta para eliminar.");
-                }
-                return;
-            }
-
-            // Verificar si estamos en la pestaña de FAT y vista de directorios
-            if (tabsCentro.getSelectedIndex() == 1 && toggleVistaFAT.isSelected()) {
-                // Vista de directorios
-                int filaSeleccionada = tablaDirectorios.getSelectedRow();
-                if (filaSeleccionada != -1) {
-                    String rutaDirectorio = (String) modeloTablaDirectorios.getValueAt(filaSeleccionada, 2);
-                    int confirmacion = JOptionPane.showConfirmDialog(this,
-                            "¿Está seguro de eliminar el directorio '" + rutaDirectorio + "' y todo su contenido?",
-                            "Confirmar Eliminación", JOptionPane.YES_NO_OPTION);
-                    if (confirmacion == JOptionPane.YES_OPTION) {
-                        eliminarDirectorioRecursivo(rutaDirectorio);
-                        actualizarVistaGlobal();
-                    }
-                } else {
-                    mostrarMensaje("Seleccione un directorio en la tabla de asignación para eliminar.");
-                }
-                return;
-            }
-
-            String nombre = obtenerNombreArchivoSeleccionado("eliminar");
-            if (nombre != null) {
-                int confirmacion = JOptionPane.showConfirmDialog(this, 
-                        "¿Está seguro de eliminar el archivo '" + nombre + "'?", 
-                        "Confirmar Eliminación", JOptionPane.YES_NO_OPTION);
-                
-                if (confirmacion == JOptionPane.YES_OPTION) {
-                    String resultado = controlador.eliminarArchivo(nombre);
-                    mostrarMensaje(resultado);
-                    if (!resultado.startsWith("Error")) {
-                        eliminarArchivoDelArbol(nombre);
-                    }
-                    actualizarVistaGlobal();
-                }
-            }
-        });
-
-        // PROCESAR SIGUIENTE PROCESO (FIFO)
-        btnProcesar.addActionListener(e -> {
-            String resultado = controlador.procesarSiguienteOperacion();
-            mostrarMensaje(resultado);
-            actualizarVistaGlobal();
-        });
     }
+
+
 
     private void mostrarEstadisticas() {
         int totalBloques = controlador.getDisco().getCapacidadTotal();
@@ -995,11 +836,18 @@ public class DashboardPrincipal extends JFrame {
             return null;
         }
 
+        if (toggleVistaFAT != null && toggleVistaFAT.isSelected()) {
+            int filaDir = tablaDirectorios.getSelectedRow();
+            if (filaDir != -1) {
+                return (String) modeloTablaDirectorios.getValueAt(filaDir, 2);
+            }
+        }
+
         int filaSeleccionada = tablaFAT.getSelectedRow();
         if (filaSeleccionada != -1) {
             return (String) modeloTablaFAT.getValueAt(filaSeleccionada, 0);
         } else {
-            return JOptionPane.showInputDialog(this, "Ingrese el nombre del archivo a " + accion + ":");
+            return JOptionPane.showInputDialog(this, "Ingrese el nombre del archivo o directorio a " + accion + ":");
         }
     }
 
@@ -1007,13 +855,17 @@ public class DashboardPrincipal extends JFrame {
     // GESTIÓN DE PERMISOS
     // =========================================================================
     private void aplicarPermisosRol() {
-        // Ejemplo de cómo puedes bloquear botones según el rol
         if (controlador.getUsuarioActivo() != null) {
-            if (controlador.getUsuarioActivo().getRol().equals(Config.ROL_USER)) {
-                // Para usuarios estándar: ocultar modificar, ya que no pueden modificar archivos
-                btnModificar.setVisible(false);
+            boolean isAdmin = controlador.getUsuarioActivo().getRol().equals(Config.ROL_ADMIN);
+            if (btnRenombrar != null) {
+                btnRenombrar.setVisible(isAdmin);
             }
         }
+        // Actualizar la interfaz
+        SwingUtilities.invokeLater(() -> {
+            this.revalidate();
+            this.repaint();
+        });
     }
 
     // =========================================================================
@@ -1092,24 +944,45 @@ public class DashboardPrincipal extends JFrame {
     
 
     private void actualizarColaProcesos() {
-        if (modeloColaProcesos == null) return;
-        modeloColaProcesos.clear();
         if (controlador == null || controlador.getPlanificador() == null) return;
-        
-        modeloColaProcesos.addElement("=== LISTOS ===");
-        for (int i=0; i < controlador.getPlanificador().getColaListos().obtenerTamano(); i++) {
-            Proceso p = controlador.getPlanificador().getColaListos().obtener(i);
-            if (p.getEstado() == Estado.LISTO) modeloColaProcesos.addElement("  " + p.getIdProceso() + " - " + p.getOperacion() + " (" + p.getArchivoObjetivo() + ")");
+
+        Planificador plan = controlador.getPlanificador();
+
+        // Actualizar LISTOS
+        modeloListos.clear();
+        for (int i = 0; i < plan.getColaListos().obtenerTamano(); i++) {
+            Proceso p = plan.getColaListos().obtener(i);
+            modeloListos.addElement(p.getIdProceso() + " - " + p.getOperacion() + " (" + p.getArchivoObjetivo() + ")");
         }
-        
-        modeloColaProcesos.addElement("=== EN CPU ===");
-        // Nota: En este simulador FIFO simple, no hay un "Proceso en CPU" persistente más allá de la ejecución instantánea.
-        
-        modeloColaProcesos.addElement("=== BLOQUEADOS ===");
-        
-        modeloColaProcesos.addElement("=== I/O EN EJECUCION ===");
-        
-        modeloColaProcesos.addElement("=== COLA I/O ===");
+
+        // Actualizar COLA I/O
+        modeloColaIO.clear();
+        for (int i = 0; i < plan.getColaIO().obtenerTamano(); i++) {
+            Proceso p = plan.getColaIO().obtener(i);
+            modeloColaIO.addElement(p.getIdProceso() + " - " + p.getOperacion() + " (" + p.getArchivoObjetivo() + ")");
+        }
+
+        // Actualizar I/O EN EJECUCION
+        modeloIOEnEjecucion.clear();
+        Proceso io = plan.getIOEnEjecucion();
+        if (io != null) {
+            modeloIOEnEjecucion.addElement(io.getIdProceso() + " - " + io.getOperacion() + " (" + io.getArchivoObjetivo() + ")");
+        }
+
+        // Actualizar BLOQUEADOS
+        modeloBloqueados.clear();
+        for (int i = 0; i < plan.getColaBloqueados().obtenerTamano(); i++) {
+            Proceso p = plan.getColaBloqueados().obtener(i);
+            modeloBloqueados.addElement(p.getIdProceso() + " - " + p.getOperacion() + " (" + p.getArchivoObjetivo() + ")");
+        }
+
+        // Actualizar PROCESO EN CPU (en grande)
+        Proceso cpu = plan.getCPUEnEjecucion();
+        if (cpu != null) {
+            lblProcesoCPU.setText("<html><center>" + cpu.getIdProceso() + "<br>" + cpu.getOperacion() + "<br>(" + cpu.getArchivoObjetivo() + ")</center></html>");
+        } else {
+            lblProcesoCPU.setText("NINGÚN PROCESO EN EJECUCIÓN");
+        }
     }
 
     private void actualizarCacheReciente(String nombreArchivo) {
@@ -1288,6 +1161,14 @@ public class DashboardPrincipal extends JFrame {
     }
 
     private void crearArchivoEnCarpetaActual() {
+        String carpetaDestino = carpetaActual;
+        if (toggleVistaFAT != null && toggleVistaFAT.isSelected()) {
+            int filaDir = tablaDirectorios.getSelectedRow();
+            if (filaDir != -1) {
+                carpetaDestino = (String) modeloTablaDirectorios.getValueAt(filaDir, 2);
+            }
+        }
+
         String nombre = JOptionPane.showInputDialog(this, "Ingrese el nombre del nuevo archivo:");
         if (nombre == null || nombre.trim().isEmpty()) {
             return;
@@ -1306,7 +1187,6 @@ public class DashboardPrincipal extends JFrame {
             return;
         }
 
-        String carpetaDestino = carpetaActual;
         String rutaCompleta = carpetaDestino + "/" + nombre;
         if (existeElementoEnCarpeta(nombre, carpetaDestino)) {
             mostrarMensaje("Error: Ya existe un elemento con ese nombre en la carpeta actual.");
@@ -1324,6 +1204,14 @@ public class DashboardPrincipal extends JFrame {
     }
 
     private void crearDirectorioEnCarpetaActual() {
+        String carpetaDestino = carpetaActual;
+        if (toggleVistaFAT != null && toggleVistaFAT.isSelected()) {
+            int filaDir = tablaDirectorios.getSelectedRow();
+            if (filaDir != -1) {
+                carpetaDestino = (String) modeloTablaDirectorios.getValueAt(filaDir, 2);
+            }
+        }
+
         String nombre = JOptionPane.showInputDialog(this, "Ingrese el nombre de la nueva carpeta:");
         if (nombre == null || nombre.trim().isEmpty()) {
             return;
@@ -1338,6 +1226,107 @@ public class DashboardPrincipal extends JFrame {
         controlador.crearCarpeta(rutaCompleta);
         agregarElementoEnCarpeta(nombre, true, controlador.getUsuarioActivo().getNombreUsuario());
         mostrarMensaje("Éxito: Carpeta creada.");
+        actualizarVistaGlobal();
+    }
+
+    private void leerArchivoSeleccionado() {
+        String nombre = obtenerNombreArchivoSeleccionado("leer");
+        if (nombre == null) return;
+
+        // Si es carpeta, cambiar vista a carpeta
+        EstructurasDeDatos.NodoArbol nodoCarpeta = controlador.getArbolDirectorios().encontrarNodoPorRuta(nombre);
+        if (nodoCarpeta != null && nodoCarpeta.getDato().isEsDirectorio()) {
+            carpetaActual = nombre;
+            seleccionarNodoPorRuta(carpetaActual);
+            mostrarVistaCarpeta();
+            actualizarVistaGlobal();
+            mostrarMensaje("Contenido de carpeta '" + carpetaActual + "' cargado.");
+            return;
+        }
+
+        String resultado = controlador.leerArchivo(nombre);
+        mostrarMensaje(resultado);
+        actualizarVistaGlobal();
+    }
+
+    private void renombrarElementoSeleccionado() {
+        String rutaActual = obtenerNombreArchivoSeleccionado("renombrar");
+        if (rutaActual == null) return;
+
+        if (controlador.getUsuarioActivo() == null || !controlador.getUsuarioActivo().esAdministrador()) {
+            mostrarMensaje("Error: Solo el administrador puede renombrar archivos o carpetas.");
+            return;
+        }
+
+        String nombreNuevo = JOptionPane.showInputDialog(this, "Ingrese el nuevo nombre:", "");
+        if (nombreNuevo == null || nombreNuevo.trim().isEmpty()) {
+            return;
+        }
+        nombreNuevo = nombreNuevo.trim();
+
+        // Validar que el nombre no contenga "/"
+        if (nombreNuevo.contains("/")) {
+            mostrarMensaje("Error: El nombre no puede contener '/'.");
+            return;
+        }
+
+        boolean esCarpeta = controlador.getArbolDirectorios().encontrarNodoPorRuta(rutaActual) != null;
+        String resultado;
+        if (esCarpeta) {
+            resultado = controlador.renombrarCarpeta(rutaActual, nombreNuevo);
+        } else {
+            resultado = controlador.renombrarArchivo(rutaActual, nombreNuevo);
+        }
+
+        mostrarMensaje(resultado);
+        actualizarVistaGlobal();
+    }
+
+    private void modificarArchivoSeleccionado() {
+        String nombre = obtenerNombreArchivoSeleccionado("modificar");
+        if (nombre == null) return;
+
+        String strTamano = JOptionPane.showInputDialog(this, "Ingrese la variación de bloques (puede ser positiva o negativa):", "0");
+        if (strTamano == null) return;
+
+        int variacion;
+        try {
+            variacion = Integer.parseInt(strTamano);
+        } catch (NumberFormatException ex) {
+            mostrarMensaje("Error: Valor inválido para modificación de tamaño.");
+            return;
+        }
+
+        String resultado = controlador.modificarArchivo(nombre, variacion);
+        mostrarMensaje(resultado);
+        actualizarVistaGlobal();
+    }
+
+    private void eliminarArchivoSeleccionado() {
+        String nombre = obtenerNombreArchivoSeleccionado("eliminar");
+        if (nombre == null) return;
+
+        int confirm = JOptionPane.showConfirmDialog(this, "¿Está seguro de que desea eliminar '" + nombre + "'?", "Confirmar eliminación", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        String resultado;
+        EstructurasDeDatos.NodoArbol nodoCarpeta = controlador.getArbolDirectorios().encontrarNodoPorRuta(nombre);
+        if (nodoCarpeta != null && nodoCarpeta.getDato().isEsDirectorio()) {
+            boolean ok = controlador.eliminarCarpeta(nombre);
+            resultado = ok ? "Éxito: Directorio eliminado." : "Error: No se pudo eliminar el directorio.";
+        } else {
+            resultado = controlador.eliminarArchivo(nombre);
+        }
+
+        mostrarMensaje(resultado);
+        if (!resultado.startsWith("Error")) {
+            if (nodoCarpeta != null && nodoCarpeta.getDato().isEsDirectorio()) {
+                // Ya eliminado desde controlador
+                reconstruirJTreeDesdeArbol();
+            } else {
+                eliminarArchivoDelArbol(nombre);
+            }
+        }
         actualizarVistaGlobal();
     }
 

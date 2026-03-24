@@ -88,4 +88,23 @@ public class DiscoV {
             actual = siguiente;
         }
     }
+
+    /**
+     * Actualiza el nombre de archivo de bloques que pertenezcan a la ruta antigua.
+     */
+    public void actualizarNombreArchivo(String rutaAntigua, String rutaNueva) {
+        if (rutaAntigua == null || rutaNueva == null) return;
+        for (int i = 0; i < capacidadTotal; i++) {
+            Bloque bloque = bloques[i];
+            if (bloque.estaOcupado() && bloque.getNombreArchivo() != null) {
+                String nombreActual = bloque.getNombreArchivo();
+                if (nombreActual.equals(rutaAntigua)) {
+                    bloque.setNombreArchivo(rutaNueva);
+                } else if (nombreActual.startsWith(rutaAntigua + "/")) {
+                    String sufijo = nombreActual.substring(rutaAntigua.length());
+                    bloque.setNombreArchivo(rutaNueva + sufijo);
+                }
+            }
+        }
+    }
 }

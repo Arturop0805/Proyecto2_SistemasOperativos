@@ -61,4 +61,8 @@ public class Bloque {
     public void setSiguiente(Bloque siguiente) {
         this.siguiente = siguiente;
     }
+
+    public void setNombreArchivo(String nombreArchivo) {
+        this.nombreArchivo = nombreArchivo;
+    }
 }
