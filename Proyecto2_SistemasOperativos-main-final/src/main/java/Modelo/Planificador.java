@@ -15,6 +15,10 @@ public class Planificador {
     
     // Usamos ListaSimple en lugar de Cola para poder extraer procesos fuera de orden (necesario para SSTF, SCAN, etc.)
     private ListaSimple<Proceso> colaListos; 
+    private ListaSimple<Proceso> colaBloqueados;
+    private ListaSimple<Proceso> colaIO;
+    private Proceso ioEnEjecucion;
+    private Proceso cpuEnEjecucion;
     private int posicionCabezal;
     private String politicaActiva;
     private boolean direccionArriba; // true para SCAN/C-SCAN ascendente (moviéndose hacia bloques mayores)
@@ -24,7 +28,11 @@ public class Planificador {
     private int distanciaTotalRecorrida;
     public Planificador(int cabezalInicial) {
         this.colaListos = new ListaSimple<Proceso>();
-        this.posicionCabezal = Config.POSICION_INICIAL_CABEZAL;
+        this.colaBloqueados = new ListaSimple<Proceso>();
+        this.colaIO = new ListaSimple<Proceso>();
+        this.ioEnEjecucion = null;
+        this.cpuEnEjecucion = null;
+        this.posicionCabezal = cabezalInicial; // inicializar según lo solicitó quien creó el planificador
         this.politicaActiva = Config.POLITICA_DEFECTO;
         this.direccionArriba = true; // Por defecto el cabezal sube
         this.historialMovimientos = new ListaSimple<Integer>();
@@ -39,7 +47,31 @@ public class Planificador {
         colaListos.insertarAlFinal(p);
     }
 
-   
+    public void encolarBloqueado(Proceso p) {
+        if (p == null) return;
+        p.bloquear();
+        colaBloqueados.insertarAlFinal(p);
+    }
+
+    public void encolarIO(Proceso p) {
+        if (p == null) return;
+        p.bloquear();
+        colaIO.insertarAlFinal(p);
+    }
+
+    public void definirIOEnEjecucion(Proceso p) {
+        this.ioEnEjecucion = p;
+        if (p != null) p.ejecutar();
+    }
+
+    public Proceso obtenerIOEnEjecucion() {
+        return ioEnEjecucion;
+    }
+
+    public void limpiarIOEnEjecucion() {
+        this.ioEnEjecucion = null;
+    }
+
     public Proceso obtenerSiguienteProceso() {
         if (colaListos.obtenerTamano() == 0) {
             return null; // No hay procesos pendientes
@@ -67,15 +99,18 @@ public class Planificador {
         // Extraemos el proceso seleccionado
         Proceso procesoEjecutar = colaListos.obtener(indiceSeleccionado);
         colaListos.eliminarPorIndice(indiceSeleccionado);
-        
+        this.cpuEnEjecucion = procesoEjecutar;
+
         // Actualizamos la posición del cabezal y registramos el movimiento
         int posAnterior = this.posicionCabezal;
         this.posicionCabezal = procesoEjecutar.getPosicionDestino();
         int distancia = Math.abs(this.posicionCabezal - posAnterior);
         this.distanciaTotalRecorrida += distancia;
         this.historialMovimientos.insertarAlFinal(this.posicionCabezal);
+
+        // El proceso pasa a ejecución en CPU
         procesoEjecutar.ejecutar();
-        
+
         return procesoEjecutar;
     }
 
@@ -169,6 +204,12 @@ public class Planificador {
     public void setDireccionArriba(boolean direccionArriba) { this.direccionArriba = direccionArriba; }
     
     public ListaSimple<Proceso> getColaListos() { return colaListos; }
+    public ListaSimple<Proceso> getColaBloqueados() { return colaBloqueados; }
+    public ListaSimple<Proceso> getColaIO() { return colaIO; }
+    public Proceso getIOEnEjecucion() { return ioEnEjecucion; }
+    public Proceso getCPUEnEjecucion() { return cpuEnEjecucion; }
+
+    public void liberarCPU() { this.cpuEnEjecucion = null; }
     // --- HISTORIAL DE MOVIMIENTOS ---
     public ListaSimple<Integer> getHistorialMovimientos() { return historialMovimientos; }
     public int getDistanciaTotalRecorrida() { return distanciaTotalRecorrida; }

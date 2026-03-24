@@ -206,23 +206,164 @@ public class ControladorSistema {
      * Procesa el siguiente proceso de la cola (FIFO por defecto).
      */
     public String procesarSiguienteOperacion() {
-        Proceso procesoEjecutado = planificador.obtenerSiguienteProceso();
+        // 1. Completar I/O en ejecución si existe
+        Proceso ioActual = planificador.getIOEnEjecucion();
+        if (ioActual != null) {
+            String resultado = ejecutarProceso(ioActual);
+            ioActual.terminar();
+            planificador.getColaBloqueados().eliminar(ioActual);
+            planificador.limpiarIOEnEjecucion();
 
-        if (procesoEjecutado == null) {
+            System.out.println("I/O completado: " + ioActual.getIdProceso() + " -> " + resultado);
+            return "I/O completado: " + ioActual.getIdProceso() + " - " + resultado;
+        }
+
+        // 2. Completar CPU en ejecución si existe
+        Proceso cpuActual = planificador.getCPUEnEjecucion();
+        if (cpuActual != null) {
+            if (Config.OP_CREATE.equals(cpuActual.getOperacion())) {
+                String resultado = ejecutarProceso(cpuActual);
+                cpuActual.terminar();
+                planificador.liberarCPU();
+
+                System.out.println("CPU completó: " + cpuActual.getIdProceso() + " -> " + resultado);
+                return "CPU completó: " + cpuActual.getIdProceso() + " - " + resultado;
+            }
+
+            // Otros ops van a I/O después de pasar por CPU
+            planificador.encolarBloqueado(cpuActual);
+            planificador.encolarIO(cpuActual);
+            planificador.liberarCPU();
+
+            String mensaje = "CPU liberada: Proceso " + cpuActual.getIdProceso() + " movido a I/O (" + cpuActual.getOperacion() + ")";
+            System.out.println(mensaje);
+            return mensaje;
+        }
+
+        // 3. Iniciar próxima operación de I/O si hay pendiente
+        if (planificador.getColaIO().obtenerTamano() > 0) {
+            Proceso proximoIO = planificador.getColaIO().obtener(0);
+            planificador.getColaIO().eliminarPorIndice(0);
+            planificador.definirIOEnEjecucion(proximoIO);
+            return "I/O en ejecución: " + proximoIO.getIdProceso() + " (" + proximoIO.getOperacion() + ")";
+        }
+
+        // 4. Tomar siguiente proceso listo para CPU
+        Proceso siguiente = planificador.obtenerSiguienteProceso();
+
+        if (siguiente == null) {
             return "No hay procesos en la cola.";
         }
 
-        String resultado = ejecutarProceso(procesoEjecutado);
-        procesoEjecutado.terminar();
+        return "CPU en ejecución: " + siguiente.getIdProceso() + " (" + siguiente.getOperacion() + ")";
+    }
 
-        // NOTA JOURNALING: Si la operación era un CREATE o DELETE,
-        // aquí deberíamos buscar la transacción en el Journal y marcarla como CONFIRMADA.
+    /**
+     * Formatea completamente el disco virtual y sistema de archivos.
+     * Solo el usuario administrador puede ejecutar esta acción.
+     */
+    public String formatearDisco() {
+        if (usuarioActivo == null || !usuarioActivo.puedeFormatearDisco()) {
+            return "Error: No tienes permisos para formatear el disco.";
+        }
 
-        System.out.println("Se ejecutó: " + procesoEjecutado.getOperacion() +
-                " sobre " + procesoEjecutado.getArchivoObjetivo() +
-                " | Nuevo cabezal: " + planificador.getPosicionCabezal());
+        this.disco = new DiscoV(Config.CAPACIDAD_DISCO_DEFECTO);
+        this.fat = new TablaAsignacion();
+        this.planificador = new Planificador(0);
+        this.arbolDirectorios = new ArbolNario(new MetadatoArchivo("SSD", true, 0));
+        this.journal = new ListaSimple<>();
+        this.txCounter = 1;
+        this.contadorProcesos = 1;
 
-        return resultado;
+        return "Disco formateado. Solo la carpeta raíz 'SSD' permanece.";
+    }
+
+    public String renombrarArchivo(String rutaActual, String nuevoNombre) {
+        if (usuarioActivo == null || !usuarioActivo.esAdministrador()) {
+            return "Error: Solo el administrador puede renombrar archivos.";
+        }
+        if (rutaActual == null || rutaActual.trim().isEmpty() || nuevoNombre == null || nuevoNombre.trim().isEmpty()) {
+            return "Error: Ruta o nombre nuevo inválido.";
+        }
+
+        EntradaFAT entrada = fat.buscarArchivo(rutaActual);
+        if (entrada == null) {
+            return "Error: El archivo no existe para renombrar.";
+        }
+
+        // Nombre libre
+        int idxSlash = rutaActual.lastIndexOf('/');
+        String rutaPadre = idxSlash >= 0 ? rutaActual.substring(0, idxSlash) : "";
+        String nuevaRuta = (rutaPadre.isEmpty() ? "" : rutaPadre + "/") + nuevoNombre;
+
+        if (fat.buscarArchivo(nuevaRuta) != null) {
+            return "Error: Ya existe un archivo con el nuevo nombre en dicha ruta.";
+        }
+
+        // Cambiar registro FAT
+        entrada.setNombreArchivo(nuevaRuta);
+
+        // Actualizar bloques del disco con la nueva ruta
+        disco.actualizarNombreArchivo(rutaActual, nuevaRuta);
+
+        // Actualizar árbol de directorios
+        arbolDirectorios.eliminarArchivo(rutaActual);
+        arbolDirectorios.insertarArchivo(nuevaRuta, entrada.getCantidadBloques());
+
+        return "Éxito: Archivo renombrado a '" + nuevaRuta + "'.";
+    }
+
+    public String renombrarCarpeta(String rutaActual, String nuevoNombre) {
+        if (usuarioActivo == null || !usuarioActivo.esAdministrador()) {
+            return "Error: Solo el administrador puede renombrar directorios.";
+        }
+        if (rutaActual == null || rutaActual.trim().isEmpty() || nuevoNombre == null || nuevoNombre.trim().isEmpty()) {
+            return "Error: Ruta o nombre nuevo inválido.";
+        }
+        if (rutaActual.equalsIgnoreCase(arbolDirectorios.getRaiz().getDato().getNombre())) {
+            return "Error: No se puede renombrar la carpeta raíz.";
+        }
+
+        EstructurasDeDatos.NodoArbol nodo = arbolDirectorios.encontrarNodoPorRuta(rutaActual);
+        if (nodo == null) {
+            return "Error: Directorio no encontrado.";
+        }
+
+        // Validar nombre no repetido entre hermanos
+        String rutaPadre = rutaActual.substring(0, rutaActual.lastIndexOf('/'));
+        EstructurasDeDatos.NodoArbol nodoPadre = arbolDirectorios.encontrarNodoPorRuta(rutaPadre);
+        if (nodoPadre == null) {
+            return "Error: Ruta padre no encontrada.";
+        }
+        for (int i = 0; i < nodoPadre.getHijos().obtenerTamano(); i++) {
+            EstructurasDeDatos.NodoArbol hijo = nodoPadre.getHijos().obtener(i);
+            if (hijo.getDato().isEsDirectorio() && hijo.getDato().getNombre().equalsIgnoreCase(nuevoNombre)) {
+                return "Error: Ya existe un directorio con ese nombre en el mismo nivel.";
+            }
+        }
+
+        String nuevaRuta = rutaPadre + "/" + nuevoNombre;
+
+        // Cambiar nombre en el nodo
+        nodo.getDato().setNombre(nuevoNombre);
+
+        // Actualizar todas las rutas de archivos dentro de este directorio en FAT y Disco
+        String prefijo = rutaActual + "/";
+        for (int i = 0; i < fat.getEntradas().obtenerTamano(); i++) {
+            EntradaFAT entrada = fat.getEntradas().obtener(i);
+            if (entrada != null) {
+                String nombreArchivo = entrada.getNombreArchivo();
+                if (nombreArchivo.startsWith(prefijo)) {
+                    String restante = nombreArchivo.substring(prefijo.length());
+                    String rutaNuevaCompleta = nuevaRuta + "/" + restante;
+                    entrada.setNombreArchivo(rutaNuevaCompleta);
+                }
+            }
+        }
+
+        disco.actualizarNombreArchivo(rutaActual, nuevaRuta);
+
+        return "Éxito: Directorio renombrado a '" + nuevaRuta + "'.";
     }
 
     private String ejecutarProceso(Proceso proceso) {
